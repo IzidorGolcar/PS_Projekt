@@ -6,54 +6,67 @@ import (
 	"sync"
 )
 
-type defaultRelation[T Record] struct {
+type relation[T Record] struct {
 	mx        *sync.RWMutex
-	confirmed map[RecordId]T
-	pending   map[uint64]T
+	keys      keyIndex
+	confirmed map[uint64]*T
+	pending   map[uint64]*T
 }
 
-func newDefaultRelation[T Record]() *defaultRelation[T] {
-	return &defaultRelation[T]{
+func newRelation[T Record]() *relation[T] {
+	return &relation[T]{
 		mx:        &sync.RWMutex{},
-		confirmed: make(map[RecordId]T),
-		pending:   make(map[uint64]T),
+		keys:      keyIndex{},
+		confirmed: make(map[uint64]*T),
+		pending:   make(map[uint64]*T),
 	}
 }
 
-func (d *defaultRelation[T]) Insert(t T) (Receipt, error) {
-	d.mx.RLock()
-	defer d.mx.RUnlock()
-	if _, ok := d.pending[t.hash()]; ok {
-		return nil, errors.New("pending record already exists")
+func (r *relation[T]) Insert(t T) (Receipt, error) {
+	r.mx.RLock()
+	defer r.mx.RUnlock()
+
+	t.SetId(r.newAutoId())
+	err := r.keys.add(t)
+	if err != nil {
+		return nil, err
 	}
-	d.pending[t.hash()] = t
-	receipt := newCallbackReceipt[T](t, d.confirm, d.cancel)
+	r.pending[t.Id()] = &t
+	receipt := newCallbackReceipt[T](t, r.confirm, r.cancel)
 	return receipt, nil
 }
 
-func (d *defaultRelation[T]) confirm(record T, id RecordId) error {
-	d.mx.Lock()
-	defer d.mx.Unlock()
-	delete(d.pending, record.hash())
-	if _, ok := d.confirmed[id]; ok {
-		return errors.New("cannot confirm record: duplicate id")
+func (r *relation[T]) newAutoId() uint64 {
+	return uint64(len(r.confirmed)) + uint64(len(r.pending))
+}
+
+func (r *relation[T]) confirm(record T) error {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+
+	delete(r.pending, record.Id())
+	if _, ok := r.confirmed[record.Id()]; ok {
+		panic("illegal state")
 	}
-	d.confirmed[record.Id()] = record
+	r.confirmed[record.Id()] = &record
 	return nil
 }
 
-func (d *defaultRelation[T]) cancel(record T, err error) {
-	d.mx.Lock()
-	defer d.mx.Unlock()
+func (r *relation[T]) cancel(record T, err error) {
+	r.mx.Lock()
+	defer r.mx.Unlock()
+	r.keys.remove(record)
 	log.Println("Canceling data write: ", err)
-	delete(d.pending, record.hash())
+	delete(r.pending, record.Id())
 }
 
-func (d *defaultRelation[T]) Get(id RecordId) (T, error) {
-	if record, ok := d.confirmed[id]; !ok {
+func (r *relation[T]) Get(id uint64) (T, error) {
+	r.mx.RLock()
+	defer r.mx.RUnlock()
+	if record, ok := r.confirmed[id]; !ok {
 		var r T
-		return r, errors.New("cannot get record: not found")
+		return r, errors.New("no such record")
 	} else {
-		return record, nil
+		return *record, nil
 	}
 }
