@@ -1,17 +1,19 @@
-package storage
+package relations
+
+import "seminarska/internal/data/storage/entities"
 
 type Receipt interface {
 	Confirm() error
 	Cancel(err error)
 }
 
-type callbackReceipt[T Record] struct {
+type callbackReceipt[T entities.Entity] struct {
 	onConfirm func(record T) error
 	onCancel  func(record T, err error)
 	record    T
 }
 
-func newCallbackReceipt[T Record](
+func newCallbackReceipt[T entities.Entity](
 	record T,
 	onConfirm func(record T) error,
 	onCancel func(record T, err error),

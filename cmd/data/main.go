@@ -24,7 +24,3 @@ func main() {
 type server struct {
 	razpravljalnica.UnimplementedMessageBoardServer
 }
-
-//func (s server) ListTopics(context.Context, *emptypb.Empty) (*razpravljalnica.ListTopicsResponse, error) {
-//
-//}

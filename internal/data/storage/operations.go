@@ -1,21 +1,31 @@
 package storage
 
-import "errors"
+import (
+	"errors"
+	"seminarska/internal/data/storage/entities"
+)
 
-func (d *Database) Insert(record Record) (rec Receipt, err error) {
+func (d *Database) Insert(record entities.Entity) error {
 	switch r := record.(type) {
-	case *UserRecord:
-		rec, err = d.users.Insert(r)
-	case *MessageRecord:
-		rec, err = d.messages.Insert(r)
-	case *TopicRecord:
-		rec, err = d.topics.Insert(r)
+	case *entities.User:
+		return ChainedInsert[*entities.User](d.users, r, d.chain)
+	case *entities.Message:
+		return ChainedInsert[*entities.Message](d.messages, r, d.chain)
+	case *entities.Topic:
+		return ChainedInsert[*entities.Topic](d.topics, r, d.chain)
 	default:
-		err = errors.New("invalid record type")
+		return errors.New("invalid record type")
 	}
-	return
 }
 
-func (d *Database) GetUser(id uint64) (rec *UserRecord, err error) {
-	return d.users.Get(id)
+func (d *Database) GetUser(id int64) (rec *entities.User, err error) {
+	return ChainedGet[*entities.User](d.users, id, d.chain)
+}
+
+func (d *Database) GetMessage(id int64) (rec *entities.Message, err error) {
+	return ChainedGet[*entities.Message](d.messages, id, d.chain)
+}
+
+func (d *Database) GetTopic(id int64) (rec *entities.Topic, err error) {
+	return ChainedGet[*entities.Topic](d.topics, id, d.chain)
 }

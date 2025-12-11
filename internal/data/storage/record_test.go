@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"seminarska/proto/datalink"
 	"testing"
 )
 
@@ -10,15 +11,19 @@ type testStruct struct {
 	age  int
 }
 
+func (t *testStruct) ToDatalinkRecord() *datalink.Record {
+	return nil
+}
+
 func TestBaseRecord(t *testing.T) {
 	type args struct {
 		record *testStruct
-		autoId uint64
+		autoId int64
 	}
 	type testCase struct {
 		name string
 		args args
-		want uint64
+		want int64
 	}
 	tests := []testCase{
 		{
@@ -53,7 +58,7 @@ func Test_primaryKeyHash(t *testing.T) {
 	}
 	tests := []testCase{
 		{
-			name: "different keys",
+			name: "different uniqueIndex",
 			args: args{
 				&testStruct{name: "A", age: 1},
 				&testStruct{name: "B", age: 1},
@@ -61,7 +66,7 @@ func Test_primaryKeyHash(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "identical keys",
+			name: "identical uniqueIndex",
 			args: args{
 				&testStruct{name: "A", age: 1},
 				&testStruct{name: "A", age: 2},

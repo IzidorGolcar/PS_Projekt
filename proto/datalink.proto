@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package datalink;
+
+option go_package = "seminarska/proto/datalink";
+
+import "razpravljalnica.proto";
+
+
+message DataWriteResponse {}
+
+message Record {
+  oneof payload {
+    razpravljalnica.User user = 1;
+    razpravljalnica.Topic topic = 2;
+    razpravljalnica.Message message = 3;
+    razpravljalnica.Like like = 4;
+  }
+}
+
+message DataSyncResponse {
+  bool synced = 1;
+}
+
+service DataLink {
+  rpc WriteData(Record) returns (DataWriteResponse);
+  rpc IsRecordSynced(Record) returns (DataSyncResponse);
+}
