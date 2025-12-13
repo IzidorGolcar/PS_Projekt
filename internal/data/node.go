@@ -7,12 +7,13 @@ import (
 	"seminarska/internal/data/config"
 	"seminarska/internal/data/requests"
 	"seminarska/internal/data/storage"
-	"seminarska/proto/datalink"
+	"seminarska/internal/data/storage/entities"
+	"time"
 )
 
 type Node struct {
 	requestsServer *requests.Server
-	database       *storage.Database
+	database       *storage.AppDatabase
 	chain          *chainedNode
 
 	ctx    context.Context
@@ -25,20 +26,47 @@ type chainedNode struct {
 	chainServer *chain.Server
 }
 
+func datalinkContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), time.Second*5)
+}
+
+func (n *chainedNode) Forward(entity entities.Entity) error {
+	ctx, cancel := datalinkContext()
+	defer cancel()
+	_, err := n.chainClient.Write(ctx, entity.ToDatalinkRecord())
+	return err
+}
+
+func (n *chainedNode) Delete(entity entities.Entity) error {
+	ctx, cancel := datalinkContext()
+	defer cancel()
+	_, err := n.chainClient.Delete(ctx, entity.ToDatalinkRecord())
+	return err
+}
+
+func (n *chainedNode) Update(entity entities.Entity) error {
+	ctx, cancel := datalinkContext()
+	defer cancel()
+	_, err := n.chainClient.Update(ctx, entity.ToDatalinkRecord())
+	return err
+}
+
+func (n *chainedNode) Compare(entity entities.Entity) (bool, error) {
+	ctx, cancel := datalinkContext()
+	defer cancel()
+	cmp, err := n.chainClient.Compare(ctx, entity.ToDatalinkRecord())
+	if err != nil {
+		return false, err
+	}
+	return cmp.Equal, nil
+}
+
 func newChainedNode(ctx context.Context, config config.NodeConfig) *chainedNode {
 	return &chainedNode{
 		chainServer: chain.NewServer(ctx, config.ChainListenerAddress),
 		chainClient: chain.NewClient(ctx, config.ChainTargetAddress),
 		tailClient:  chain.NewClient(ctx, config.TailAddress),
 	}
-}
-
-func (n *chainedNode) ForwardRequest(record *datalink.Record) error {
-	return n.chainClient.WriteData(record)
-}
-
-func (n *chainedNode) IsSynced(record *datalink.Record) (bool, error) {
-	return n.tailClient.Sync(record)
 }
 
 func (n *chainedNode) await(ctx context.Context) {
@@ -63,7 +91,7 @@ func NewNode(ctx context.Context, config config.NodeConfig) *Node {
 	n := &Node{
 		ctx:            serverCtx,
 		cancel:         cancel,
-		database:       storage.NewDatabase(&chainedNode{}),
+		database:       storage.NewAppDatabase(&chainedNode{}),
 		chain:          newChainedNode(serverCtx, config),
 		requestsServer: requests.NewServer(serverCtx, config.ServiceAddress),
 	}

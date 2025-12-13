@@ -9,10 +9,13 @@ import (
 	"seminarska/proto/datalink"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type listener struct {
-	db *storage.Database
+	db *storage.AppDatabase
 	datalink.UnimplementedDataLinkServer
 }
 
@@ -20,10 +23,10 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 	datalink.RegisterDataLinkServer(grpcServer, l)
 }
 
-func (l *listener) WriteData(
+func (l *listener) Write(
 	ctx context.Context,
 	req *datalink.Record,
-) (*datalink.DataWriteResponse, error) {
+) (*emptypb.Empty, error) {
 	var record entities.Entity
 	switch p := req.Payload.(type) {
 	case *datalink.Record_User:
@@ -36,7 +39,7 @@ func (l *listener) WriteData(
 		)
 		record.SetId(p.Message.Id)
 	case *datalink.Record_Like:
-		//request = NewWriteRequest(p.Like)
+
 	case *datalink.Record_Topic:
 		record = entities.NewTopic(p.Topic.Name)
 		record.SetId(p.Topic.Id)
@@ -49,15 +52,29 @@ func (l *listener) WriteData(
 		return nil, err
 	}
 
-	return &datalink.DataWriteResponse{}, nil
+	return &emptypb.Empty{}, nil
 }
 
-func (l *listener) IsRecordSynced(
+func (l *listener) Delete(ctx context.Context, req *datalink.Record) (*emptypb.Empty, error) {
+	var err error
+	switch p := req.Payload.(type) {
+	case *datalink.Record_User:
+		err = l.db.DeleteUser(p.User.Id)
+	default:
+		return nil, errors.New("invalid payload")
+	}
+
+	return &emptypb.Empty{}, err
+}
+func (l *listener) Update(context.Context, *datalink.Record) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
+}
+
+func (l *listener) Compare(
 	ctx context.Context,
 	req *datalink.Record,
-) (*datalink.DataSyncResponse, error) {
-
-	var result any
+) (*datalink.Comparison, error) {
+	var result entities.Entity
 	var err error
 	switch p := req.Payload.(type) {
 	case *datalink.Record_User:
@@ -69,11 +86,11 @@ func (l *listener) IsRecordSynced(
 	default:
 		return nil, errors.New("invalid payload")
 	}
-
 	if err != nil {
-		return nil, err
+		return &datalink.Comparison{Equal: false}, err
 	}
-	return &datalink.DataSyncResponse{Synced: result != nil}, nil
+	equal := result.ToDatalinkRecord().Payload == req.Payload
+	return &datalink.Comparison{Equal: equal}, nil
 }
 
 type Server struct {

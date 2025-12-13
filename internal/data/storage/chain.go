@@ -1,51 +1,90 @@
 package storage
 
 import (
-	"errors"
 	"fmt"
+	"seminarska/internal/data/storage/db"
 	"seminarska/internal/data/storage/entities"
-	"seminarska/internal/data/storage/relations"
-	"seminarska/proto/datalink"
 )
 
-type DatabaseChain interface {
-	ForwardRequest(*datalink.Record) error
-	IsSynced(*datalink.Record) (bool, error)
+type ChainHandler interface {
+	Forward(entities.Entity) error
+	Delete(entities.Entity) error
+	Update(entities.Entity) error
+	Compare(entities.Entity) (bool, error)
 }
 
-func ChainedInsert[T entities.Entity](r *relations.Relation[T], record T, chain DatabaseChain) error {
-	receipt, err := r.Insert(record)
+func ChainedInsert[E entities.Entity](r *db.Relation[E], e E, chain ChainHandler) error {
+	receipt, err := r.Insert(e)
 	if err != nil {
-		return fmt.Errorf("failed to insert record: %w", err)
+		return fmt.Errorf("failed to insert e: %w", err)
 	}
-	err = chain.ForwardRequest(record.ToDatalinkRecord())
+	err = chain.Forward(e)
 	if err != nil {
 		receipt.Cancel(err)
 		return fmt.Errorf("failed to forward request: %w", err)
 	}
 	err = receipt.Confirm()
 	if err != nil {
-		receipt.Cancel(err)
 		return fmt.Errorf("failed to confirm receipt: %w", err)
 	}
 	return nil
 }
 
-func ChainedGet[T entities.Entity](r *relations.Relation[T], id int64, chain DatabaseChain) (record T, err error) {
-	rec, dirty, err := r.Get(id)
+func ChainedDelete[E entities.Entity](r *db.Relation[E], id int64, chain ChainHandler) error {
+	rec, err := r.Delete(id)
 	if err != nil {
+		return fmt.Errorf("failed to delete record: %w", err)
+	}
+	err = chain.Delete(rec.DeletedValue())
+	if err != nil {
+		rec.Cancel(err)
+		return fmt.Errorf("failed to forward request: %w", err)
+	}
+	err = rec.Confirm()
+	if err != nil {
+		return fmt.Errorf("failed to confirm receipt: %w", err)
+	}
+	return nil
+
+}
+
+func ChainedUpdate[E entities.Entity](
+	r *db.Relation[E],
+	id int64,
+	transform db.TransformFunc[E],
+	chain ChainHandler,
+) error {
+	rec, err := r.Update(id, transform)
+	if err != nil {
+		return fmt.Errorf("failed to update record: %w", err)
+	}
+	err = chain.Update(rec.NewValue())
+	if err != nil {
+		return fmt.Errorf("failed to forward request: %w", err)
+	}
+	err = rec.Confirm()
+	if err != nil {
+		return fmt.Errorf("failed to confirm receipt: %w", err)
+	}
+	return nil
+}
+
+func ChainedGet[E entities.Entity](r *db.Relation[E], id int64, chain ChainHandler) (e E, err error) {
+	record, err := r.Get(id)
+	if err != nil {
+		err = fmt.Errorf("failed to get record: %w", err)
 		return
 	}
-	if !dirty {
-		return rec, nil
+	if record.IsDirty() {
+		e, _ = record.DirtyValue()
+		var eq bool
+		eq, err = chain.Compare(e)
+		if err != nil {
+			err = fmt.Errorf("failed to sync record: %w", err)
+		}
+		if !eq {
+			e, _ = record.Value()
+		}
 	}
-	synced, err := chain.IsSynced(rec.ToDatalinkRecord())
-	if err != nil {
-		return
-	}
-	if synced {
-		return rec, nil
-	}
-	err = errors.New("no such record")
 	return
 }

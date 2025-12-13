@@ -1,8 +1,7 @@
-package relations
+package db
 
 import (
 	"errors"
-	"log"
 	"seminarska/internal/data/storage/entities"
 )
 
@@ -23,7 +22,8 @@ func (r *Relation[E]) insertUnsafe(e E) (Receipt, error) {
 	if err != nil {
 		return nil, err
 	}
-	record := newRecord(e)
+	record := NewMutableRecord[E]()
+	_ = record.Write(e)
 	r.records[e.Id()] = record
 	receipt := newInsertReceipt(r, record)
 	return receipt, nil
@@ -31,29 +31,32 @@ func (r *Relation[E]) insertUnsafe(e E) (Receipt, error) {
 
 type insertReceipt[E entities.Entity] struct {
 	r      *Relation[E]
-	record *record[E]
+	record *MutableRecord[E]
 }
 
-func newInsertReceipt[E entities.Entity](r *Relation[E], record *record[E]) *insertReceipt[E] {
-	record.dirty = true
-	record.dirtyMx.Lock()
+func newInsertReceipt[E entities.Entity](r *Relation[E], record *MutableRecord[E]) *insertReceipt[E] {
 	return &insertReceipt[E]{r: r, record: record}
 }
 
 func (i *insertReceipt[E]) Confirm() error {
 	i.r.mx.Lock()
-	i.record.dirty = false
-	i.r.mx.Unlock()
-	i.record.dirtyMx.Unlock()
+	defer i.r.mx.Unlock()
+	if err := i.record.Commit(); err != nil {
+		panic(err)
+	}
 	return nil
 }
 
 func (i *insertReceipt[E]) Cancel(err error) {
-	log.Println("Cancelled insert:", err)
 	i.r.mx.Lock()
 	defer i.r.mx.Unlock()
-	i.record.dirty = false
-	delete(i.r.records, i.record.value.Id())
-	i.r.uniqueIndex.Remove(i.record.value)
-	i.record.dirtyMx.Unlock()
+	if err := i.record.Rollback(); err != nil {
+		panic(err)
+	}
+	e, err := i.record.Value()
+	if err != nil {
+		panic(err)
+	}
+	delete(i.r.records, e.Id())
+	i.r.uniqueIndex.Remove(e)
 }

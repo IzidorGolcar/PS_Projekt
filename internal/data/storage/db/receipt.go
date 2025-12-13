@@ -1,4 +1,4 @@
-package relations
+package db
 
 type Receipt interface {
 	Confirm() error

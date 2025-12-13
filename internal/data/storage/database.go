@@ -1,22 +1,22 @@
 package storage
 
 import (
+	"seminarska/internal/data/storage/db"
 	"seminarska/internal/data/storage/entities"
-	"seminarska/internal/data/storage/relations"
 )
 
-type Database struct {
-	chain    DatabaseChain
-	users    *relations.Relation[*entities.User]
-	messages *relations.Relation[*entities.Message]
-	topics   *relations.Relation[*entities.Topic]
+type AppDatabase struct {
+	chain    ChainHandler
+	users    *db.Relation[*entities.User]
+	messages *db.Relation[*entities.Message]
+	topics   *db.Relation[*entities.Topic]
 }
 
-func NewDatabase(chain DatabaseChain) *Database {
-	return &Database{
+func NewAppDatabase(chain ChainHandler) *AppDatabase {
+	return &AppDatabase{
 		chain:    chain,
-		users:    relations.NewRelation[*entities.User](),
-		messages: relations.NewRelation[*entities.Message](),
-		topics:   relations.NewRelation[*entities.Topic](),
+		users:    db.NewRelation[*entities.User](),
+		messages: db.NewRelation[*entities.Message](),
+		topics:   db.NewRelation[*entities.Topic](),
 	}
 }

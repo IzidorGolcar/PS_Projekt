@@ -8,7 +8,7 @@ import (
 )
 
 type listener struct {
-	db *storage.Database
+	db *storage.AppDatabase
 	razpravljalnica.UnimplementedMessageBoardServer
 }
 

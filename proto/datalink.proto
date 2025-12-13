@@ -5,9 +5,7 @@ package datalink;
 option go_package = "seminarska/proto/datalink";
 
 import "razpravljalnica.proto";
-
-
-message DataWriteResponse {}
+import "google/protobuf/empty.proto";
 
 message Record {
   oneof payload {
@@ -18,11 +16,13 @@ message Record {
   }
 }
 
-message DataSyncResponse {
-  bool synced = 1;
+message Comparison {
+  bool equal = 1;
 }
 
 service DataLink {
-  rpc WriteData(Record) returns (DataWriteResponse);
-  rpc IsRecordSynced(Record) returns (DataSyncResponse);
+  rpc Write(Record) returns (google.protobuf.Empty);
+  rpc Delete(Record) returns (google.protobuf.Empty);
+  rpc Update(Record) returns (google.protobuf.Empty);
+  rpc Compare(Record) returns (Comparison);
 }
