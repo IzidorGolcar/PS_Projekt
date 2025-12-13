@@ -37,7 +37,7 @@ func (n *chainedNode) ForwardRequest(record *datalink.Record) error {
 	return n.chainClient.WriteData(record)
 }
 
-func (n *chainedNode) SyncedWithTail(record *datalink.Record) (bool, error) {
+func (n *chainedNode) IsSynced(record *datalink.Record) (bool, error) {
 	return n.tailClient.Sync(record)
 }
 

@@ -6,13 +6,13 @@ import (
 )
 
 type Database struct {
-	chain    Chain
+	chain    DatabaseChain
 	users    *relations.Relation[*entities.User]
 	messages *relations.Relation[*entities.Message]
 	topics   *relations.Relation[*entities.Topic]
 }
 
-func NewDatabase(chain Chain) *Database {
+func NewDatabase(chain DatabaseChain) *Database {
 	return &Database{
 		chain:    chain,
 		users:    relations.NewRelation[*entities.User](),

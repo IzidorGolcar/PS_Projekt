@@ -8,12 +8,12 @@ import (
 	"seminarska/proto/datalink"
 )
 
-type Chain interface {
+type DatabaseChain interface {
 	ForwardRequest(*datalink.Record) error
-	SyncedWithTail(*datalink.Record) (bool, error)
+	IsSynced(*datalink.Record) (bool, error)
 }
 
-func ChainedInsert[T entities.Entity](r *relations.Relation[T], record T, chain Chain) error {
+func ChainedInsert[T entities.Entity](r *relations.Relation[T], record T, chain DatabaseChain) error {
 	receipt, err := r.Insert(record)
 	if err != nil {
 		return fmt.Errorf("failed to insert record: %w", err)
@@ -31,21 +31,20 @@ func ChainedInsert[T entities.Entity](r *relations.Relation[T], record T, chain 
 	return nil
 }
 
-func ChainedGet[T entities.Entity](r *relations.Relation[T], id int64, chain Chain) (record T, err error) {
-	var res relations.Result[T]
-	res, err = r.Get(id)
+func ChainedGet[T entities.Entity](r *relations.Relation[T], id int64, chain DatabaseChain) (record T, err error) {
+	rec, dirty, err := r.Get(id)
 	if err != nil {
 		return
 	}
-	if res.confirmed {
-		return res.record, nil
+	if !dirty {
+		return rec, nil
 	}
-	synced, err := chain.SyncedWithTail(res.record.ToDatalinkRecord())
+	synced, err := chain.IsSynced(rec.ToDatalinkRecord())
 	if err != nil {
 		return
 	}
 	if synced {
-		return res.record, nil
+		return rec, nil
 	}
 	err = errors.New("no such record")
 	return

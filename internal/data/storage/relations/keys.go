@@ -11,6 +11,10 @@ func newUniqueIndex[E any]() *keys.Index {
 
 func getUniqueFields[E any]() (fields []string) {
 	e := reflect.TypeOf((*E)(nil)).Elem()
+	// Unwrap pointers until we reach a non-pointer type
+	for e.Kind() == reflect.Pointer {
+		e = e.Elem()
+	}
 	if e.Kind() != reflect.Struct {
 		panic("Type must be a struct")
 	}
