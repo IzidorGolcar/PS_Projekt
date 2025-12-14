@@ -1,26 +1,34 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"log"
-	"net"
-	"seminarska/proto/razpravljalnica"
-
-	"google.golang.org/grpc"
+	"os"
+	"os/signal"
+	"seminarska/internal/data"
+	"seminarska/internal/data/config"
+	"time"
 )
 
 func main() {
-	lis, err := net.Listen("tcp", ":0")
-	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
-	}
-	s := grpc.NewServer()
-	razpravljalnica.RegisterMessageBoardServer(s, &server{})
-	log.Printf("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
-	}
+	cfg := config.Load()
+	configureLogger(cfg.NodeId)
+	ctx, cancel := signal.NotifyContext(context.Background())
+	defer cancel()
+	log.Println("Starting data service")
+	service := data.NewService(ctx, cfg)
+	<-ctx.Done()
+	log.Println("Stopping data service")
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancelShutdown()
+	service.Await(shutdownCtx)
+	log.Println("Data service stopped")
 }
 
-type server struct {
-	razpravljalnica.UnimplementedMessageBoardServer
+func configureLogger(serviceId string) {
+	log.Default().SetOutput(os.Stdout)
+	log.Default().SetFlags(log.LstdFlags | log.Lmsgprefix)
+	prefix := fmt.Sprintf("[%s] ", serviceId)
+	log.Default().SetPrefix(prefix)
 }

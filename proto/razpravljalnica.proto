@@ -30,9 +30,10 @@ message Message {
 }
 
 message Like {
-  int64 topic_id = 1;
-  int64 message_id = 2;
-  int64 user_id = 3; // user who liked the message
+  int64 id = 1; // added like record id!
+  int64 topic_id = 2;
+  int64 message_id = 3;
+  int64 user_id = 4; // user who liked the message
 }
 
 enum OpType {

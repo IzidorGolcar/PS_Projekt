@@ -9,8 +9,6 @@ import (
 	"seminarska/proto/datalink"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -23,73 +21,73 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 	datalink.RegisterDataLinkServer(grpcServer, l)
 }
 
-func (l *listener) Write(
-	ctx context.Context,
-	req *datalink.Record,
-) (*emptypb.Empty, error) {
-	var record entities.Entity
-	switch p := req.Payload.(type) {
-	case *datalink.Record_User:
-		record = entities.NewUser(p.User.Name)
-		record.SetId(p.User.Id)
-	case *datalink.Record_Message:
-		record = entities.NewMessage(
-			p.Message.TopicId, p.Message.UserId,
-			p.Message.Text, p.Message.CreatedAt.AsTime(),
-		)
-		record.SetId(p.Message.Id)
-	case *datalink.Record_Like:
-
-	case *datalink.Record_Topic:
-		record = entities.NewTopic(p.Topic.Name)
-		record.SetId(p.Topic.Id)
-	default:
-		return nil, errors.New("invalid payload")
-	}
-
-	err := l.db.Insert(record)
+func (l *listener) Write(_ context.Context, req *datalink.Record) (*emptypb.Empty, error) {
+	record, err := entities.DatalinkToEntity(req)
 	if err != nil {
-		return nil, err
+		return &emptypb.Empty{}, err
 	}
-
+	err = l.db.Insert(record)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
 	return &emptypb.Empty{}, nil
 }
 
-func (l *listener) Delete(ctx context.Context, req *datalink.Record) (*emptypb.Empty, error) {
-	var err error
-	switch p := req.Payload.(type) {
-	case *datalink.Record_User:
-		err = l.db.DeleteUser(p.User.Id)
+func (l *listener) Delete(_ context.Context, req *datalink.Record) (*emptypb.Empty, error) {
+	record, err := entities.DatalinkToEntity(req)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	switch record.(type) {
+	case *entities.User:
+		err = l.db.DeleteUser(record.Id())
+	case *entities.Message:
+		err = l.db.DeleteMessage(record.Id())
 	default:
-		return nil, errors.New("invalid payload")
+		err = errors.New("invalid record type")
 	}
 
 	return &emptypb.Empty{}, err
 }
-func (l *listener) Update(context.Context, *datalink.Record) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method Update not implemented")
+func (l *listener) Update(_ context.Context, req *datalink.Record) (*emptypb.Empty, error) {
+	record, err := entities.DatalinkToEntity(req)
+	if err != nil {
+		return &emptypb.Empty{}, err
+	}
+	msg, ok := record.(*entities.Message)
+	if !ok {
+		return &emptypb.Empty{}, errors.New("invalid record type")
+	}
+	err = l.db.UpdateMessage(msg.Id(), func(current *entities.Message) (*entities.Message, error) {
+		return msg, nil
+	})
+	return &emptypb.Empty{}, err
 }
 
 func (l *listener) Compare(
 	ctx context.Context,
 	req *datalink.Record,
 ) (*datalink.Comparison, error) {
-	var result entities.Entity
-	var err error
-	switch p := req.Payload.(type) {
-	case *datalink.Record_User:
-		result, err = l.db.GetUser(p.User.Id)
-	case *datalink.Record_Message:
-		result, err = l.db.GetMessage(p.Message.Id)
-	case *datalink.Record_Topic:
-		result, err = l.db.GetTopic(p.Topic.Id)
-	default:
-		return nil, errors.New("invalid payload")
-	}
+	record, err := entities.DatalinkToEntity(req)
 	if err != nil {
 		return &datalink.Comparison{Equal: false}, err
 	}
-	equal := result.ToDatalinkRecord().Payload == req.Payload
+	var localRecord entities.Entity
+	switch record.(type) {
+	case *entities.User:
+		localRecord, err = l.db.GetUser(record.Id())
+	case *entities.Topic:
+		localRecord, err = l.db.GetTopic(record.Id())
+	case *entities.Message:
+		localRecord, err = l.db.GetMessage(record.Id())
+	case *entities.Like:
+		localRecord, err = l.db.GetLike(record.Id())
+	}
+
+	if err != nil {
+		return &datalink.Comparison{Equal: false}, err
+	}
+	equal := localRecord == record
 	return &datalink.Comparison{Equal: equal}, nil
 }
 

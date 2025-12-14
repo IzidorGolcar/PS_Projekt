@@ -1,11 +1,6 @@
 package entities
 
-import (
-	"seminarska/proto/datalink"
-)
-
 type Entity interface {
-	ToDatalinkRecord() *datalink.Record
 	SetId(id int64)
 	Id() int64
 }

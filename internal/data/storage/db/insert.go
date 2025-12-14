@@ -5,13 +5,13 @@ import (
 	"seminarska/internal/data/storage/entities"
 )
 
-func (r *Relation[E]) Insert(e E) (Receipt, error) {
+func (r *Relation[E]) Insert(e E) (*InsertReceipt[E], error) {
 	r.mx.Lock()
 	defer r.mx.Unlock()
 	return r.insertUnsafe(e)
 }
 
-func (r *Relation[E]) insertUnsafe(e E) (Receipt, error) {
+func (r *Relation[E]) insertUnsafe(e E) (*InsertReceipt[E], error) {
 	if e.Id() == 0 {
 		e.SetId(r.idIndex.next())
 	}
@@ -29,16 +29,16 @@ func (r *Relation[E]) insertUnsafe(e E) (Receipt, error) {
 	return receipt, nil
 }
 
-type insertReceipt[E entities.Entity] struct {
+type InsertReceipt[E entities.Entity] struct {
 	r      *Relation[E]
 	record *MutableRecord[E]
 }
 
-func newInsertReceipt[E entities.Entity](r *Relation[E], record *MutableRecord[E]) *insertReceipt[E] {
-	return &insertReceipt[E]{r: r, record: record}
+func newInsertReceipt[E entities.Entity](r *Relation[E], record *MutableRecord[E]) *InsertReceipt[E] {
+	return &InsertReceipt[E]{r: r, record: record}
 }
 
-func (i *insertReceipt[E]) Confirm() error {
+func (i *InsertReceipt[E]) Confirm() error {
 	i.r.mx.Lock()
 	defer i.r.mx.Unlock()
 	if err := i.record.Commit(); err != nil {
@@ -47,7 +47,7 @@ func (i *insertReceipt[E]) Confirm() error {
 	return nil
 }
 
-func (i *insertReceipt[E]) Cancel(err error) {
+func (i *InsertReceipt[E]) Cancel(err error) {
 	i.r.mx.Lock()
 	defer i.r.mx.Unlock()
 	if err := i.record.Rollback(); err != nil {

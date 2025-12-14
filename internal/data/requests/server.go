@@ -3,7 +3,20 @@ package requests
 import (
 	"context"
 	"seminarska/internal/common/rpc"
+	"seminarska/internal/data/storage"
+	"seminarska/proto/razpravljalnica"
+
+	"google.golang.org/grpc"
 )
+
+type listener struct {
+	db *storage.AppDatabase
+	razpravljalnica.UnimplementedMessageBoardServer
+}
+
+func (l *listener) Register(grpcServer *grpc.Server) {
+	razpravljalnica.RegisterMessageBoardServer(grpcServer, l)
+}
 
 type Server struct {
 	rpcServer *rpc.Server

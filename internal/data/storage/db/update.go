@@ -2,10 +2,11 @@ package db
 
 import (
 	"errors"
+	"fmt"
 	"seminarska/internal/data/storage/entities"
 )
 
-type TransformFunc[E entities.Entity] func(E) E
+type TransformFunc[E entities.Entity] func(E) (E, error)
 
 func (r *Relation[E]) Update(id int64, transform TransformFunc[E]) (*UpdateReceipt[E], error) {
 	r.mx.Lock()
@@ -18,7 +19,10 @@ func (r *Relation[E]) Update(id int64, transform TransformFunc[E]) (*UpdateRecei
 	if err != nil {
 		return nil, err
 	}
-	updated := transform(current)
+	updated, err := transform(current)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform: %w", err)
+	}
 	if updated.Id() != id {
 		return nil, errors.New("cannot change id")
 	}

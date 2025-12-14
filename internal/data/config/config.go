@@ -1,6 +1,7 @@
 package config
 
 type NodeConfig struct {
+	NodeId               string
 	ServiceAddress       string
 	ChainListenerAddress string
 	ChainTargetAddress   string
@@ -14,4 +15,8 @@ func DefaultNodeConfig() *NodeConfig {
 		ChainTargetAddress:   ":0",
 		TailAddress:          ":0",
 	}
+}
+
+func Load() NodeConfig {
+	return *DefaultNodeConfig()
 }

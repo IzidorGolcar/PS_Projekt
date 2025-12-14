@@ -1,35 +1,33 @@
 package entities
 
 import (
-	"seminarska/proto/datalink"
-	"seminarska/proto/razpravljalnica"
 	"time"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Message struct {
 	baseEntity
-	topicId   int64     `storage:"pk"`
-	userId    int64     `storage:"pk"`
-	text      string    `storage:"pk"`
-	createdAt time.Time `storage:"pk"`
-	likes     int
+	topicId   int64 `db:"unique"`
+	userId    int64 `db:"unique"`
+	text      string
+	createdAt time.Time `db:"unique"`
+}
+
+func (m *Message) TopicId() int64 {
+	return m.topicId
+}
+
+func (m *Message) UserId() int64 {
+	return m.userId
+}
+
+func (m *Message) Text() string {
+	return m.text
+}
+
+func (m *Message) CreatedAt() time.Time {
+	return m.createdAt
 }
 
 func NewMessage(topicId int64, userId int64, text string, createdAt time.Time) *Message {
 	return &Message{topicId: topicId, userId: userId, text: text, createdAt: createdAt}
-}
-
-func (r *Message) ToDatalinkRecord() *datalink.Record {
-	return &datalink.Record{
-		Payload: &datalink.Record_Message{Message: &razpravljalnica.Message{
-			Id:        r.id,
-			TopicId:   r.topicId,
-			UserId:    r.userId,
-			Text:      r.text,
-			CreatedAt: timestamppb.New(r.createdAt),
-			Likes:     int32(r.likes),
-		}},
-	}
 }
