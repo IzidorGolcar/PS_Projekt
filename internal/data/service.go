@@ -18,17 +18,23 @@ type Service struct {
 
 func NewService(ctx context.Context, config config.NodeConfig) *Service {
 	serverCtx, cancel := context.WithCancel(ctx)
-	chainNode := chain.NewNode(serverCtx, config)
+	chainNode := chain.NewNode(serverCtx, config.ChainListenerAddress)
 	n := &Service{
 		ctx:            serverCtx,
 		cancel:         cancel,
-		database:       storage.NewAppDatabase(chainNode),
 		chain:          chainNode,
+		database:       storage.NewAppDatabase(serverCtx, chainNode),
 		requestsServer: requests.NewServer(serverCtx, config.ServiceAddress),
 	}
 	return n
 }
 
-func (n *Service) Await(ctx context.Context) {
-	n.chain.Await(ctx)
+func (n *Service) Close() {
+	n.cancel()
+}
+
+func (n *Service) Await(ctx context.Context) error {
+	<-n.database.Done()
+	<-n.chain.Done()
+	panic("not implemented")
 }
