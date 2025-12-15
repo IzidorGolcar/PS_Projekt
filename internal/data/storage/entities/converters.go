@@ -8,21 +8,21 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func DatalinkToEntity(dl *datalink.Record) (entity Entity, err error) {
+func DatalinkToEntity(dl *datalink.Message) (entity Entity, err error) {
 	switch p := dl.Payload.(type) {
-	case *datalink.Record_User:
+	case *datalink.Message_User:
 		entity = NewUser(p.User.Name)
 		entity.SetId(p.User.Id)
-	case *datalink.Record_Message:
+	case *datalink.Message_Message:
 		entity = NewMessage(
 			p.Message.TopicId, p.Message.UserId,
 			p.Message.Text, p.Message.CreatedAt.AsTime(),
 		)
 		entity.SetId(p.Message.Id)
-	case *datalink.Record_Like:
+	case *datalink.Message_Like:
 		entity = NewLike(p.Like.MessageId, p.Like.UserId)
 		entity.SetId(p.Like.Id)
-	case *datalink.Record_Topic:
+	case *datalink.Message_Topic:
 		entity = NewTopic(p.Topic.Name)
 		entity.SetId(p.Topic.Id)
 	default:
@@ -31,18 +31,18 @@ func DatalinkToEntity(dl *datalink.Record) (entity Entity, err error) {
 	return
 }
 
-func EntityToDatalink(entity Entity) (dl *datalink.Record) {
+func EntityToDatalink(entity Entity) (dl *datalink.Message) {
 	switch e := entity.(type) {
 	case *User:
-		return &datalink.Record{
-			Payload: &datalink.Record_User{User: &razpravljalnica.User{
+		return &datalink.Message{
+			Payload: &datalink.Message_User{User: &razpravljalnica.User{
 				Id:   e.id,
 				Name: e.name,
 			}},
 		}
 	case *Message:
-		return &datalink.Record{
-			Payload: &datalink.Record_Message{Message: &razpravljalnica.Message{
+		return &datalink.Message{
+			Payload: &datalink.Message_Message{Message: &razpravljalnica.Message{
 				Id:        e.id,
 				TopicId:   e.topicId,
 				UserId:    e.userId,
@@ -51,15 +51,15 @@ func EntityToDatalink(entity Entity) (dl *datalink.Record) {
 			}},
 		}
 	case *Topic:
-		return &datalink.Record{
-			Payload: &datalink.Record_Topic{Topic: &razpravljalnica.Topic{
+		return &datalink.Message{
+			Payload: &datalink.Message_Topic{Topic: &razpravljalnica.Topic{
 				Id:   e.id,
 				Name: e.name,
 			}},
 		}
 	case *Like:
-		return &datalink.Record{
-			Payload: &datalink.Record_Like{Like: &razpravljalnica.Like{
+		return &datalink.Message{
+			Payload: &datalink.Message_Like{Like: &razpravljalnica.Like{
 				MessageId: e.messageId,
 				UserId:    e.userId,
 			}},

@@ -5,24 +5,33 @@ package datalink;
 option go_package = "seminarska/proto/datalink";
 
 import "razpravljalnica.proto";
-import "google/protobuf/empty.proto";
 
-message Record {
+enum Operation {
+  Create = 0;
+  Update = 1;
+  Delete = 2;
+}
+
+message Message {
+  int32 message_id = 1;
+  Operation op = 2;
   oneof payload {
-    razpravljalnica.User user = 1;
-    razpravljalnica.Topic topic = 2;
-    razpravljalnica.Message message = 3;
-    razpravljalnica.Like like = 4;
+    razpravljalnica.User user = 3;
+    razpravljalnica.Topic topic = 4;
+    razpravljalnica.Message message = 5;
+    razpravljalnica.Like like = 6;
   }
 }
 
-message Comparison {
-  bool equal = 1;
+message Confirmation {
+  int32 message_id = 1;
+  bool ok = 2;
+  optional string error = 3;
 }
 
 service DataLink {
-  rpc Write(Record) returns (google.protobuf.Empty);
-  rpc Delete(Record) returns (google.protobuf.Empty);
-  rpc Update(Record) returns (google.protobuf.Empty);
-  rpc Compare(Record) returns (Comparison);
+
+  // TODO: sync()
+
+  rpc Replicate(stream Message) returns (stream Confirmation);
 }

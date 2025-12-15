@@ -7,10 +7,9 @@ import (
 )
 
 type ChainHandler interface {
-	Forward(entities.Entity) error
+	Create(entities.Entity) error
 	Delete(entities.Entity) error
 	Update(entities.Entity) error
-	Compare(entities.Entity) (bool, error)
 }
 
 func ChainedInsert[E entities.Entity](r *db.Relation[E], e E, chain ChainHandler) error {
@@ -18,7 +17,7 @@ func ChainedInsert[E entities.Entity](r *db.Relation[E], e E, chain ChainHandler
 	if err != nil {
 		return fmt.Errorf("failed to insert e: %w", err)
 	}
-	err = chain.Forward(e)
+	err = chain.Create(e)
 	if err != nil {
 		receipt.Cancel(err)
 		return fmt.Errorf("failed to forward request: %w", err)
@@ -67,58 +66,4 @@ func ChainedUpdate[E entities.Entity](
 		return fmt.Errorf("failed to confirm receipt: %w", err)
 	}
 	return nil
-}
-
-func ChainedGet[E entities.Entity](r *db.Relation[E], id int64, chain ChainHandler) (e E, err error) {
-	record, err := r.Get(id)
-	if err != nil {
-		err = fmt.Errorf("failed to get record: %w", err)
-		return
-	}
-	if record.IsDirty() {
-		e, _ = record.DirtyValue()
-		var eq bool
-		eq, err = chain.Compare(e)
-		if err != nil {
-			err = fmt.Errorf("failed to sync record: %w", err)
-		}
-		if !eq {
-			e, _ = record.Value()
-		}
-	}
-	return
-}
-
-func ChainedGetPredicate[E entities.Entity](
-	r *db.Relation[E],
-	chain ChainHandler,
-	predicate db.PredicateFunc[E],
-	limit int,
-) ([]E, error) {
-	// fixme ignores edge case
-	// when dirty value satisfies predicate but is not yet confirmed in the tail,
-	// the confirmed value (if it exists) should be checked and returned if appropriate
-	records, err := r.GetPredicate(predicate, limit)
-	if err != nil {
-		return nil, err
-	}
-	values := make([]E, 0, len(records))
-	for _, record := range records {
-		var e E
-		if record.IsDirty() {
-			e, _ = record.DirtyValue()
-			var eq bool
-			eq, err = chain.Compare(e)
-			if err != nil {
-				return nil, fmt.Errorf("failed to sync record: %w", err)
-			}
-			if !eq {
-				continue
-			}
-		} else {
-			e, _ = record.Value()
-		}
-		values = append(values, e)
-	}
-	return values, nil
 }
