@@ -13,7 +13,7 @@ enum Operation {
 }
 
 message Message {
-  int32 message_id = 1;
+  int32 message_index = 1;
   Operation op = 2;
   oneof payload {
     razpravljalnica.User user = 3;
@@ -24,9 +24,9 @@ message Message {
 }
 
 message Confirmation {
-  int32 message_id = 1;
+  int32 message_index = 1;
   bool ok = 2;
-  optional string error = 3;
+  string error = 3;
 }
 
 service DataLink {

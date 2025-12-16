@@ -18,41 +18,42 @@ func (r *Relation[E]) getRecord(id int64) (e *MutableRecord[E], err error) {
 	return rec, nil
 }
 
-func (r *Relation[E]) Get(id int64) (rec Record[E], err error) {
+func (r *Relation[E]) Get(id int64) (e E, err error) {
 	r.mx.RLock()
 	defer r.mx.RUnlock()
 	record, err := r.getRecord(id)
 	if err != nil {
 		return
 	}
-	return record.CurrentSnapshot(), nil
+	if record.IsDirty() {
+		err = ErrNotFound
+		return
+	}
+	return record.Value()
 }
+
+const NoLimit = 0
 
 func (r *Relation[E]) GetPredicate(
 	predicate PredicateFunc[E],
 	limit int,
-) (rec []Record[E], err error) {
+) (values []E, err error) {
+	if limit < 0 {
+		return nil, errors.New("limit must be non-negative")
+	}
 	r.mx.RLock()
 	defer r.mx.RUnlock()
 	for _, record := range r.records {
-		if record.IsDirty() {
-			e, err := record.DirtyValue()
-			if err != nil {
-				continue
-			}
-			if predicate(e) {
-				rec = append(rec, record.CurrentSnapshot())
-			}
-		} else {
+		if !record.IsDirty() {
 			e, err := record.Value()
 			if err != nil {
 				continue
 			}
 			if predicate(e) {
-				rec = append(rec, record.CurrentSnapshot())
+				values = append(values, e)
 			}
 		}
-		if len(rec) == limit {
+		if len(values) == limit && limit != NoLimit {
 			break
 		}
 	}

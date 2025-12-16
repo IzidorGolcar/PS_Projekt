@@ -15,24 +15,14 @@ func (l *listener) CreateUser(
 	_ context.Context,
 	request *razpravljalnica.CreateUserRequest,
 ) (*razpravljalnica.User, error) {
-	user := entities.NewUser(request.Name)
-	err := l.db.Insert(user)
-	if err != nil {
-		return nil, err
-	}
-	return entities.EntityToDatalink(user).GetUser(), nil
+
 }
 
 func (l *listener) CreateTopic(
 	_ context.Context,
 	request *razpravljalnica.CreateTopicRequest,
 ) (*razpravljalnica.Topic, error) {
-	topic := entities.NewTopic(request.Name)
-	err := l.db.Insert(topic)
-	if err != nil {
-		return nil, err
-	}
-	return entities.EntityToDatalink(topic).GetTopic(), nil
+
 }
 
 func (l *listener) PostMessage(
@@ -100,7 +90,7 @@ func (l *listener) ListTopics(
 	_ context.Context,
 	_ *emptypb.Empty,
 ) (*razpravljalnica.ListTopicsResponse, error) {
-	topics, err := l.db.GetTopics(0, 1000)
+	topics, err := l.db.GetTopics()
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +107,7 @@ func (l *listener) GetMessages(
 	_ context.Context,
 	request *razpravljalnica.GetMessagesRequest,
 ) (*razpravljalnica.GetMessagesResponse, error) {
-	messages, err := l.db.GetMessages(request.GetFromMessageId(), int(request.GetLimit()))
+	messages, err := l.db.GetMessages(request.GetFromMessageId(), request.GetLimit())
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +121,7 @@ func (l *listener) GetMessages(
 		if err != nil {
 			return nil, err
 		}
-		msg.Likes = int32(len(likes))
+		msg.Likes = int32(likes)
 		out[i] = msg
 	}
 	return &razpravljalnica.GetMessagesResponse{
