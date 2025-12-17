@@ -1,18 +1,25 @@
 package config
 
-type NodeConfig struct {
-	NodeId               string
-	ServiceAddress       string
-	ChainListenerAddress string
-}
+import "flag"
 
-func DefaultNodeConfig() *NodeConfig {
-	return &NodeConfig{
-		ServiceAddress:       ":0",
-		ChainListenerAddress: ":0",
-	}
+type NodeConfig struct {
+	NodeId                 string
+	ServiceAddress         string
+	ChainListenerAddress   string
+	ControlListenerAddress string
 }
 
 func Load() NodeConfig {
-	return *DefaultNodeConfig()
+	id := flag.String("id", "data-node", "Node ID")
+	serviceAddress := flag.String("service", ":0", "Service address")
+	chainListenerAddress := flag.String("chain", ":0", "Chain listener address")
+	controlListenerAddress := flag.String("control", ":0", "Control listener address")
+	flag.Parse()
+
+	return NodeConfig{
+		NodeId:                 *id,
+		ServiceAddress:         *serviceAddress,
+		ChainListenerAddress:   *chainListenerAddress,
+		ControlListenerAddress: *controlListenerAddress,
+	}
 }

@@ -14,14 +14,14 @@ import (
 func main() {
 	cfg := config.Load()
 	configureLogger(cfg.NodeId)
-	ctx, cancel := signal.NotifyContext(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	log.Println("Starting data service")
 	service := data.NewService(ctx, cfg)
 	<-ctx.Done()
 	log.Println("Stopping data service")
 	select {
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		log.Println("Forcefully stopping data service")
 	case <-service.Done():
 		log.Println("Data service stopped")

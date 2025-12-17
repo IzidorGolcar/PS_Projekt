@@ -22,8 +22,8 @@ type Server struct {
 	rpcServer *rpc.Server
 }
 
-func NewServer(ctx context.Context, addr string) *Server {
-	l := &listener{}
+func NewServer(ctx context.Context, database *storage.AppDatabase, addr string) *Server {
+	l := &listener{db: database}
 	s := rpc.NewServer(ctx, l, addr)
 	return &Server{
 		rpcServer: s,

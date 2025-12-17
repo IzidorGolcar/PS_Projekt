@@ -17,11 +17,12 @@ type Relations interface {
 
 type response struct {
 	requestId string
-	entityId int64
+	entityId  int64
+	err       error
 }
 
-func newResponse(requestId string, entityId int64) response {
-	return response{requestId: requestId, entityId: entityId}
+func newResponse(requestId string, entityId int64, err error) response {
+	return response{requestId: requestId, entityId: entityId, err: err}
 }
 
 type Handler struct {
@@ -45,7 +46,7 @@ func (h *Handler) AwaitConfirmation(ctx context.Context, requestId string) (int6
 	defer cancel()
 	for res := range h.broadcast.Subscribe(subCtx) {
 		if res.requestId == requestId {
-			return res.entityId, nil
+			return res.entityId, res.err
 		}
 	}
 	return 0, subCtx.Err()

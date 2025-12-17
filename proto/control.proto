@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package controllink;
+option go_package = "seminarska/proto/controllink";
+
+import "google/protobuf/empty.proto";
+
+message SwitchSuccessorCommand {
+  string Address = 1; // empty string for disconnect
+}
+
+service ControlService {
+  rpc SwitchSuccessor(SwitchSuccessorCommand) returns (google.protobuf.Empty);
+}

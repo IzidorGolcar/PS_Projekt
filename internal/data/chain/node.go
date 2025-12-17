@@ -7,15 +7,6 @@ import (
 	"seminarska/proto/datalink"
 )
 
-type NodeState int
-
-const (
-	StateHead NodeState = iota
-	StateMiddle
-	StateTail
-	StateSingleNode
-)
-
 // MessageProducer produces messages at the head of the chain
 type MessageProducer interface {
 	Messages() <-chan *datalink.Message
@@ -53,7 +44,7 @@ type Node struct {
 	chainClient *Client
 	chainServer *Server
 	done        chan struct{}
-	state       chan NodeState
+	dfa         *nodeDFA
 	counter     *OpCounter
 }
 
@@ -62,22 +53,19 @@ func NewNode(
 	chain UniversalChainNode,
 	listenerAddress string,
 ) *Node {
+	dfa := newNodeDFA(ctx)
 	n := &Node{
 		ctx:         ctx,
 		interceptor: chain,
 		producer:    chain,
 		done:        make(chan struct{}),
-		state:       make(chan NodeState, 1),
-		chainClient: NewClient(ctx, 1000),
-		chainServer: NewServer(ctx, listenerAddress, 1000),
+		dfa:         dfa,
+		chainClient: NewClient(ctx, dfa, 1000),
+		chainServer: NewServer(ctx, dfa, listenerAddress, 1000),
 		counter:     NewOpCounter(0),
 	}
 	go n.run()
 	return n
-}
-
-func (n *Node) SetState(state NodeState) {
-	n.state <- state
 }
 
 func (n *Node) run() {
@@ -88,26 +76,30 @@ func (n *Node) run() {
 	)
 	for {
 		select {
-		case state := <-n.state:
+		case state := <-n.dfa.state():
+			log.Println("Switching to state: ", state)
 			if cancel != nil {
 				cancel()
 			}
 			stateCtx, cancel = context.WithCancel(n.ctx)
 			switch state {
-			case StateHead:
+			case Head:
 				go n.runAsHead(stateCtx)
-			case StateMiddle:
+			case Middle:
 				go n.runAsMid(stateCtx)
-			case StateTail:
+			case Tail:
 				go n.runAsTail(stateCtx)
-			case StateSingleNode:
+			case SingleNode:
 				go n.runAsSingleNode(stateCtx)
+			case IllegalState:
+				panic("Illegal node state")
 			}
 		case <-n.ctx.Done():
+			log.Println("Shutting down node")
 			if cancel != nil {
 				cancel()
-				return
 			}
+			return
 		}
 	}
 }
@@ -120,6 +112,12 @@ func (n *Node) runAsHead(ctx context.Context) {
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
 				log.Println("Failed to process message: ", err)
+				errConf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					Ok:           false, Error: err.Error(),
+					RequestId: msg.GetRequestId(),
+				}
+				n.interceptor.OnConfirmation(errConf)
 			} else {
 				n.chainClient.Outbound() <- msg
 			}
@@ -137,13 +135,21 @@ func (n *Node) runAsMid(ctx context.Context) {
 		case msg := <-n.chainServer.Inbound():
 			if msg.GetMessageIndex() != n.counter.Next() {
 				err := errors.New("message not synced")
-				errConf := &datalink.Confirmation{MessageIndex: msg.GetMessageIndex(), Ok: false, Error: err.Error()}
+				errConf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					RequestId:    msg.GetRequestId(),
+					Ok:           false, Error: err.Error(),
+				}
 				n.interceptor.OnConfirmation(errConf)
 			}
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
 				log.Println("Failed to process message: ", err)
-				errConf := &datalink.Confirmation{MessageIndex: msg.GetMessageIndex(), Ok: false, Error: err.Error()}
+				errConf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					RequestId:    msg.GetRequestId(),
+					Ok:           false, Error: err.Error(),
+				}
 				n.chainServer.Outbound() <- errConf
 			} else {
 				n.chainClient.Outbound() <- msg
@@ -163,14 +169,32 @@ func (n *Node) runAsTail(ctx context.Context) {
 		case msg := <-n.chainServer.Inbound():
 			if msg.GetMessageIndex() != n.counter.Next() {
 				err := errors.New("message not synced")
-				errConf := &datalink.Confirmation{MessageIndex: msg.GetMessageIndex(), Ok: false, Error: err.Error()}
+				errConf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					RequestId:    msg.GetRequestId(),
+					Ok:           false, Error: err.Error(),
+				}
 				n.interceptor.OnConfirmation(errConf)
+				n.chainServer.Outbound() <- errConf
 			}
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
 				log.Println("Failed to process message: ", err)
-				errConf := &datalink.Confirmation{MessageIndex: msg.GetMessageIndex(), Ok: false, Error: err.Error()}
+				errConf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					RequestId:    msg.GetRequestId(),
+					Ok:           false, Error: err.Error(),
+				}
+				n.interceptor.OnConfirmation(errConf)
 				n.chainServer.Outbound() <- errConf
+			} else {
+				conf := &datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					RequestId:    msg.GetRequestId(),
+					Ok:           true,
+				}
+				n.interceptor.OnConfirmation(conf)
+				n.chainServer.Outbound() <- conf
 			}
 		case <-ctx.Done():
 			return
@@ -186,9 +210,15 @@ func (n *Node) runAsSingleNode(ctx context.Context) {
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
 				log.Println("Failed to process message: ", err)
+				n.interceptor.OnConfirmation(&datalink.Confirmation{
+					MessageIndex: msg.GetMessageIndex(),
+					Ok:           false, Error: err.Error(),
+					RequestId: msg.GetRequestId(),
+				})
 			} else {
 				n.interceptor.OnConfirmation(&datalink.Confirmation{
 					MessageIndex: msg.GetMessageIndex(), Ok: true,
+					RequestId: msg.GetRequestId(),
 				})
 			}
 		case <-ctx.Done():

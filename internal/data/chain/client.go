@@ -11,15 +11,21 @@ import (
 
 type Client struct {
 	ctx      context.Context
+	state    *nodeDFA
 	addr     chan string
 	requests chan *datalink.Message
 	replies  chan *datalink.Confirmation
 	done     chan struct{}
 }
 
-func NewClient(ctx context.Context, buffer int) *Client {
+func NewClient(
+	ctx context.Context,
+	state *nodeDFA,
+	buffer int,
+) *Client {
 	c := &Client{
 		ctx:      ctx,
+		state:    state,
 		addr:     make(chan string),
 		requests: make(chan *datalink.Message, buffer),
 		replies:  make(chan *datalink.Confirmation, buffer),
@@ -48,8 +54,10 @@ func (c *Client) run() {
 			if cancel != nil {
 				cancel(errAddressChange)
 			}
-			connectionCtx, cancel = context.WithCancelCause(c.ctx)
-			go c.superviseConnection(addr, connectionCtx)
+			if addr != "" {
+				connectionCtx, cancel = context.WithCancelCause(c.ctx)
+				go c.superviseConnection(addr, connectionCtx)
+			}
 		case <-c.ctx.Done():
 			if cancel != nil {
 				cancel(nil)
@@ -61,8 +69,12 @@ func (c *Client) run() {
 
 func (c *Client) superviseConnection(addr string, ctx context.Context) {
 	for {
+		log.Println("datalink connecting to ", addr)
 		rpcClient := rpc.NewClient(ctx, addr)
 		link := datalink.NewDataLinkClient(rpcClient)
+
+		// TODO: perform sync with next node, switch state
+
 		err := c.superviseStream(link, ctx)
 		if err != nil {
 			if errors.Is(err, errAddressChange) ||
@@ -86,6 +98,8 @@ func (c *Client) superviseStream(link datalink.DataLinkClient, ctx context.Conte
 	if err != nil {
 		return err
 	}
+	c.state.emit(successorConnect)
+	defer c.state.emit(successorDisconnect)
 	supervisor := NewStreamSupervisor(c.requests, c.replies)
 	defer func() {
 		if supervisor.DroppedMessage() != nil {

@@ -14,7 +14,6 @@ type GrpcService interface {
 
 type Server struct {
 	ctx     context.Context
-	cancel  context.CancelFunc
 	addr    string
 	s       *grpc.Server
 	service GrpcService
@@ -26,10 +25,8 @@ func NewServer(
 	service GrpcService,
 	addr string,
 ) *Server {
-	ctx, cancel := context.WithCancel(ctx)
 	s := &Server{
 		ctx:     ctx,
-		cancel:  cancel,
 		s:       grpc.NewServer(),
 		service: service,
 		addr:    addr,
@@ -51,6 +48,7 @@ func (s *Server) handleShutdown() {
 }
 
 func (s *Server) serve() {
+	defer close(s.done)
 	lis, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
@@ -58,11 +56,6 @@ func (s *Server) serve() {
 	if err := s.s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
-	close(s.done)
-}
-
-func (s *Server) Stop() {
-	s.cancel()
 }
 
 func (s *Server) Done() <-chan struct{} {

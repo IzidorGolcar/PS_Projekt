@@ -2,29 +2,24 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"seminarska/internal/common/rpc"
 	"seminarska/proto/razpravljalnica"
-	"time"
-
-	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-	conn, err := grpc.NewClient(":52799", grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-	c := razpravljalnica.NewMessageBoardClient(conn)
+	ctx := context.Background()
+	client := rpc.NewClient(ctx, ":5972")
+	service := razpravljalnica.NewMessageBoardClient(client)
 
-	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	r, err := c.ListTopics(ctx, &empty.Empty{})
+	topic, err := createTopic(ctx, service)
 	if err != nil {
-		log.Fatalf("could not greet: %v", err)
+		log.Fatal(err)
 	}
-	log.Printf("Greeting: %s", r.Topics)
+	fmt.Println(topic)
+}
+
+func createTopic(ctx context.Context, client razpravljalnica.MessageBoardClient) (*razpravljalnica.Topic, error) {
+	return client.CreateTopic(ctx, &razpravljalnica.CreateTopicRequest{Name: "test"})
 }
