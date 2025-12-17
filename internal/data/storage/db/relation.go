@@ -10,7 +10,6 @@ type Relation[E entities.Entity] struct {
 	mx          *sync.RWMutex
 	uniqueIndex *keys.Index
 	records     map[int64]*MutableRecord[E]
-	idIndex     *monotonicIndex
 }
 
 func NewRelation[E entities.Entity]() *Relation[E] {
@@ -18,6 +17,5 @@ func NewRelation[E entities.Entity]() *Relation[E] {
 		mx:          &sync.RWMutex{},
 		uniqueIndex: newUniqueIndex[E](),
 		records:     make(map[int64]*MutableRecord[E]),
-		idIndex:     newMonotonicIndex(0),
 	}
 }

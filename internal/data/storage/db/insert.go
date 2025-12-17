@@ -1,7 +1,6 @@
 package db
 
 import (
-	"errors"
 	"seminarska/internal/data/storage/entities"
 )
 
@@ -12,12 +11,6 @@ func (r *Relation[E]) Insert(e E) (*InsertReceipt[E], error) {
 }
 
 func (r *Relation[E]) insertUnsafe(e E) (*InsertReceipt[E], error) {
-	if e.Id() == 0 {
-		e.SetId(r.idIndex.next())
-	}
-	if _, ok := r.records[e.Id()]; ok {
-		return nil, errors.New("duplicate id")
-	}
 	err := r.uniqueIndex.Add(e)
 	if err != nil {
 		return nil, err

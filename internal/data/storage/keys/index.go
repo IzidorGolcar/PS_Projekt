@@ -2,39 +2,54 @@ package keys
 
 import (
 	"errors"
+	"seminarska/internal/data/storage/entities"
+)
+
+var (
+	ErrDuplicateId = errors.New("duplicate id")
+	ErrConstraint  = errors.New("unique constraint violation")
 )
 
 type Index struct {
 	set           map[uint64]struct{}
+	ids           map[int64]struct{}
 	indexedFields []string
 }
 
 func NewIndex(fields ...string) *Index {
 	return &Index{
 		set:           make(map[uint64]struct{}),
+		ids:           make(map[int64]struct{}),
 		indexedFields: fields,
 	}
 }
 
-func (i Index) Add(t any) error {
+func (i Index) Add(e entities.Entity) error {
+	if _, used := i.ids[e.Id()]; used {
+		return ErrDuplicateId
+	}
 	if len(i.indexedFields) == 0 {
 		return nil
 	}
-	key := structHash(t, i.indexedFields)
+	key := structHash(e, i.indexedFields)
 	if _, used := i.set[key]; used {
-		return errors.New("unique constraint violation")
+		return ErrConstraint
 	}
 	i.set[key] = struct{}{}
 	return nil
 }
 
-func (i Index) Remove(t any) {
+func (i Index) Remove(e entities.Entity) {
+	delete(i.ids, e.Id())
 	if len(i.indexedFields) > 0 {
-		delete(i.set, structHash(t, i.indexedFields))
+		delete(i.set, structHash(e, i.indexedFields))
 	}
 }
 
-func (i Index) Replace(old, new any) error {
+func (i Index) Replace(old, new entities.Entity) error {
+	if old.Id() != new.Id() {
+		return errors.New("cannot replace entities with different ids")
+	}
 	current := structHash(old, i.indexedFields)
 	i.Remove(old)
 	err := i.Add(new)

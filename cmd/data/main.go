@@ -20,10 +20,12 @@ func main() {
 	service := data.NewService(ctx, cfg)
 	<-ctx.Done()
 	log.Println("Stopping data service")
-	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancelShutdown()
-	service.Await(shutdownCtx)
-	log.Println("Data service stopped")
+	select {
+	case <-time.After(5 * time.Second):
+		log.Println("Forcefully stopping data service")
+	case <-service.Done():
+		log.Println("Data service stopped")
+	}
 }
 
 func configureLogger(serviceId string) {

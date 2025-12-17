@@ -1,10 +1,11 @@
 package replication
 
 import (
+	"context"
+	"seminarska/internal/common/broadcast"
 	"seminarska/internal/data/storage/db"
 	"seminarska/internal/data/storage/entities"
 	"seminarska/proto/datalink"
-	"sync"
 )
 
 type Relations interface {
@@ -14,17 +15,38 @@ type Relations interface {
 	Likes() *db.Relation[*entities.Like]
 }
 
+type response struct {
+	requestId string
+	entityId int64
+}
+
+func newResponse(requestId string, entityId int64) response {
+	return response{requestId: requestId, entityId: entityId}
+}
+
 type Handler struct {
 	relations       Relations
 	pendingRequests map[int32]db.Receipt
 	newMessages     chan *datalink.Message
-	mx              *sync.RWMutex
+	broadcast       *broadcast.Broadcaster[response]
 }
 
 func NewHandler(relations Relations) *Handler {
 	return &Handler{
 		relations:       relations,
+		broadcast:       broadcast.New[response](),
 		pendingRequests: make(map[int32]db.Receipt),
 		newMessages:     make(chan *datalink.Message),
 	}
+}
+
+func (h *Handler) AwaitConfirmation(ctx context.Context, requestId string) (int64, error) {
+	subCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for res := range h.broadcast.Subscribe(subCtx) {
+		if res.requestId == requestId {
+			return res.entityId, nil
+		}
+	}
+	return 0, subCtx.Err()
 }

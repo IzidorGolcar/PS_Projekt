@@ -7,6 +7,9 @@ import (
 )
 
 func (h *Handler) OnConfirmation(confirmation *datalink.Confirmation) {
+	h.broadcast.Broadcast(newResponse(
+		confirmation.GetRequestId(), int64(confirmation.GetMessageIndex()),
+	))
 	receipt, ok := h.pendingRequests[confirmation.GetMessageIndex()]
 	if !ok {
 		return

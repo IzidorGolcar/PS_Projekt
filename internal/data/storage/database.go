@@ -46,3 +46,7 @@ func NewAppDatabase() *AppDatabase {
 		chain:     replication.NewHandler(relations),
 	}
 }
+
+func (d *AppDatabase) Chain() *replication.Handler {
+	return d.chain
+}

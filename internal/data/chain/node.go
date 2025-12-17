@@ -27,6 +27,11 @@ type MessageInterceptor interface {
 	OnConfirmation(confirmation *datalink.Confirmation)
 }
 
+type UniversalChainNode interface {
+	MessageProducer
+	MessageInterceptor
+}
+
 type OpCounter struct {
 	n int
 }
@@ -54,12 +59,13 @@ type Node struct {
 
 func NewNode(
 	ctx context.Context,
-	interceptor MessageInterceptor,
+	chain UniversalChainNode,
 	listenerAddress string,
 ) *Node {
 	n := &Node{
 		ctx:         ctx,
-		interceptor: interceptor,
+		interceptor: chain,
+		producer:    chain,
 		done:        make(chan struct{}),
 		state:       make(chan NodeState, 1),
 		chainClient: NewClient(ctx, 1000),

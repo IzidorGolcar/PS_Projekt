@@ -14,19 +14,21 @@ enum Operation {
 
 message Message {
   int32 message_index = 1;
-  Operation op = 2;
+  string request_id = 2; // used to identify the message independently of its index (which is not immediately known)
+  Operation op = 3;
   oneof payload {
-    razpravljalnica.User user = 3;
-    razpravljalnica.Topic topic = 4;
-    razpravljalnica.Message message = 5;
-    razpravljalnica.Like like = 6;
+    razpravljalnica.User user = 4;
+    razpravljalnica.Topic topic = 5;
+    razpravljalnica.Message message = 6;
+    razpravljalnica.Like like = 7;
   }
 }
 
 message Confirmation {
   int32 message_index = 1;
-  bool ok = 2;
-  string error = 3;
+  string request_id = 2;
+  bool ok = 3;
+  string error = 4;
 }
 
 service DataLink {

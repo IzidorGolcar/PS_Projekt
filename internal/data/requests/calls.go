@@ -2,80 +2,79 @@ package requests
 
 import (
 	"context"
-	"errors"
 	"seminarska/internal/data/storage/entities"
 	"seminarska/proto/razpravljalnica"
-	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (l *listener) CreateUser(
-	_ context.Context,
+	ctx context.Context,
 	request *razpravljalnica.CreateUserRequest,
 ) (*razpravljalnica.User, error) {
-
-}
-
-func (l *listener) CreateTopic(
-	_ context.Context,
-	request *razpravljalnica.CreateTopicRequest,
-) (*razpravljalnica.Topic, error) {
-
-}
-
-func (l *listener) PostMessage(
-	_ context.Context,
-	request *razpravljalnica.PostMessageRequest,
-) (*razpravljalnica.Message, error) {
-	timestamp := time.Now()
-	message := entities.NewMessage(request.TopicId, request.UserId, request.Text, timestamp)
-	err := l.db.Insert(message)
+	user, err := l.db.CreateUser(ctx, request.GetName())
 	if err != nil {
 		return nil, err
 	}
-	return entities.EntityToDatalink(message).GetMessage(), nil
+	return entities.EntityToDatalink(user).GetUser(), nil
+}
+
+func (l *listener) CreateTopic(
+	ctx context.Context,
+	request *razpravljalnica.CreateTopicRequest,
+) (*razpravljalnica.Topic, error) {
+	topic, err := l.db.CreateTopic(ctx, request.GetName())
+	if err != nil {
+		return nil, err
+	}
+	return entities.EntityToDatalink(topic).GetTopic(), nil
+}
+
+func (l *listener) PostMessage(
+	ctx context.Context,
+	request *razpravljalnica.PostMessageRequest,
+) (*razpravljalnica.Message, error) {
+	msg, err := l.db.PostMessage(ctx, request.GetUserId(), request.GetTopicId(), request.GetText())
+	if err != nil {
+		return nil, err
+	}
+	return entities.EntityToDatalink(msg).GetMessage(), nil
 }
 
 func (l *listener) UpdateMessage(
-	_ context.Context,
+	ctx context.Context,
 	request *razpravljalnica.UpdateMessageRequest,
-) (out *razpravljalnica.Message, err error) {
-	err = l.db.UpdateMessage(request.MessageId, func(current *entities.Message) (*entities.Message, error) {
-		if current.TopicId() != request.TopicId {
-			return nil, errors.New("topic mismatch")
-		}
-		if current.UserId() != request.UserId {
-			return nil, errors.New("user mismatch")
-		}
-		updated := entities.NewMessage(
-			current.Id(), current.UserId(), request.Text, current.CreatedAt(),
-		)
-		out = entities.EntityToDatalink(updated).GetMessage()
-		return updated, nil
-	})
+) (*razpravljalnica.Message, error) {
+	msg, err := l.db.UpdateMessage(ctx, request.GetUserId(), request.GetMessageId(), request.GetText())
+	if err != nil {
+		return nil, err
+	}
 	likes, err := l.db.GetLikes(request.MessageId)
 	if err != nil {
 		return nil, err
 	}
-	out.Likes = int32(len(likes))
-	return
+	out := entities.EntityToDatalink(msg).GetMessage()
+	if out == nil {
+		panic("illegal state:")
+	}
+	out.Likes = int32(likes)
+	return out, nil
 }
 
 func (l *listener) DeleteMessage(
-	_ context.Context,
+	ctx context.Context,
 	request *razpravljalnica.DeleteMessageRequest,
 ) (*emptypb.Empty, error) {
-	err := l.db.DeleteMessage(request.GetMessageId())
+	err := l.db.DeleteMessage(ctx, request.GetUserId(), request.GetMessageId())
 	return &emptypb.Empty{}, err
 }
 
 func (l *listener) LikeMessage(
-	_ context.Context,
+	ctx context.Context,
 	request *razpravljalnica.LikeMessageRequest,
 ) (*razpravljalnica.Message, error) {
-	err := l.db.LikeMessage(request.MessageId, request.UserId)
+	err := l.db.LikeMessage(ctx, request.MessageId, request.UserId)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +82,12 @@ func (l *listener) LikeMessage(
 	if err != nil {
 		return nil, err
 	}
-	return entities.EntityToDatalink(msg).GetMessage(), nil
+	out := entities.EntityToDatalink(msg).GetMessage()
+	if out == nil {
+		panic("illegal state:")
+	}
+	out.Likes++
+	return out, nil
 }
 
 func (l *listener) ListTopics(

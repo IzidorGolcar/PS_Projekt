@@ -29,3 +29,7 @@ func NewServer(ctx context.Context, addr string) *Server {
 		rpcServer: s,
 	}
 }
+
+func (s *Server) Done() <-chan struct{} {
+	return s.rpcServer.Done()
+}

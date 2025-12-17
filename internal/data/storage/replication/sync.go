@@ -7,13 +7,12 @@ import (
 	"seminarska/proto/datalink"
 )
 
-// fixme: who assigns ids? head? tail?? everyone???
-
 func (h *Handler) OnMessage(message *datalink.Message) error {
 	entity, err := entities.DatalinkToEntity(message)
 	if err != nil {
 		return err
 	}
+	entity.SetId(int64(message.MessageIndex))
 	receipt, err := h.chainedOperation(entity, message.GetOp())
 	if err != nil {
 		return err

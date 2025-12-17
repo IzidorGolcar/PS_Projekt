@@ -44,18 +44,32 @@ func (r *Relation[E]) GetPredicate(
 	r.mx.RLock()
 	defer r.mx.RUnlock()
 	for _, record := range r.records {
-		if !record.IsDirty() {
-			e, err := record.Value()
-			if err != nil {
-				continue
-			}
-			if predicate(e) {
-				values = append(values, e)
-			}
+		e, err := record.Value()
+		if err != nil {
+			continue
+		}
+		if predicate(e) {
+			values = append(values, e)
 		}
 		if len(values) == limit && limit != NoLimit {
 			break
 		}
 	}
 	return
+}
+
+func (r *Relation[E]) GetAll() (values []E, err error) {
+	return r.GetPredicate(func(e E) bool { return true }, NoLimit)
+}
+
+func (r *Relation[E]) Count() int {
+	r.mx.RLock()
+	defer r.mx.RUnlock()
+	return len(r.records)
+}
+
+func (r *Relation[E]) GetTransform(id int64, transform TransformFunc[E]) (e E, err error) {
+	r.mx.RLock()
+	defer r.mx.RUnlock()
+	return r.getTransform(id, transform)
 }
