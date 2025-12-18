@@ -4,10 +4,13 @@ import (
 	"context"
 	"log"
 	"seminarska/internal/common/rpc"
+	"seminarska/internal/common/stream"
 	"seminarska/proto/datalink"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
@@ -54,20 +57,24 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 	datalink.RegisterDataLinkServer(grpcServer, l)
 }
 
-func (l *listener) Replicate(stream grpc.BidiStreamingServer[datalink.Message, datalink.Confirmation]) error {
+func (l *listener) Handshake(grpc.BidiStreamingServer[datalink.ClientHandshakeMsg, datalink.ServerHandshakeMsg]) error {
+	return status.Error(codes.Unimplemented, "method Handshake not implemented")
+}
+
+func (l *listener) Replicate(s grpc.BidiStreamingServer[datalink.Message, datalink.Confirmation]) error {
 	l.state.emit(predecessorConnect)
 	defer l.state.emit(predecessorDisconnect)
-	if p, ok := peer.FromContext(stream.Context()); ok {
+	if p, ok := peer.FromContext(s.Context()); ok {
 		log.Println("New node connected:", p.Addr.String())
 	} else {
 		log.Println("New node connected")
 	}
-	ctx := stream.Context()
-	supervisor := NewStreamSupervisor(l.outbound, l.inbound)
+	ctx := s.Context()
+	supervisor := stream.NewSupervisor(l.outbound, l.inbound)
 	defer func() {
 		if supervisor.DroppedMessage() != nil {
 			panic("dropped message")
 		}
 	}()
-	return supervisor.Run(ctx, stream)
+	return supervisor.Run(ctx, s)
 }

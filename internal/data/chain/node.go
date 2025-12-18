@@ -18,6 +18,10 @@ type MessageInterceptor interface {
 	OnConfirmation(confirmation *datalink.Confirmation)
 }
 
+// TODO will probably need some sort of confirmation (and message) replay buffer
+// message buffer can only include unconfirmed messages, conf buffer should probably
+// contain all confirmations sent since the last message arrived from the predecessor
+
 type UniversalChainNode interface {
 	MessageProducer
 	MessageInterceptor
@@ -81,6 +85,7 @@ func (n *Node) run() {
 			if cancel != nil {
 				cancel()
 			}
+
 			stateCtx, cancel = context.WithCancel(n.ctx)
 			switch state {
 			case Head:
@@ -111,6 +116,7 @@ func (n *Node) runAsHead(ctx context.Context) {
 			msg.MessageIndex = n.counter.Next()
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
+				// todo n.counter.Back()
 				log.Println("Failed to process message: ", err)
 				errConf := &datalink.Confirmation{
 					MessageIndex: msg.GetMessageIndex(),
@@ -133,6 +139,7 @@ func (n *Node) runAsMid(ctx context.Context) {
 	for {
 		select {
 		case msg := <-n.chainServer.Inbound():
+			// todo always forward messages in mid nodes
 			if msg.GetMessageIndex() != n.counter.Next() {
 				err := errors.New("message not synced")
 				errConf := &datalink.Confirmation{
@@ -144,6 +151,7 @@ func (n *Node) runAsMid(ctx context.Context) {
 			}
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
+				//
 				log.Println("Failed to process message: ", err)
 				errConf := &datalink.Confirmation{
 					MessageIndex: msg.GetMessageIndex(),

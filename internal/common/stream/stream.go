@@ -1,33 +1,33 @@
-package chain
+package stream
 
 import (
 	"context"
 	"errors"
 )
 
-type Stream[Req any, Res any] interface {
+type BidiStream[Req any, Res any] interface {
 	Send(req Req) error
 	Recv() (Res, error)
 }
 
-type StreamSupervisor[O any, I any] struct {
+type Supervisor[O any, I any] struct {
 	outbound       chan O
 	inbound        chan I
 	droppedMessage *O
 }
 
-func NewStreamSupervisor[O any, I any](
+func NewSupervisor[O any, I any](
 	outbound chan O,
 	inbound chan I,
-) *StreamSupervisor[O, I] {
-	return &StreamSupervisor[O, I]{outbound, inbound, nil}
+) *Supervisor[O, I] {
+	return &Supervisor[O, I]{outbound, inbound, nil}
 }
 
-func (c *StreamSupervisor[O, I]) DroppedMessage() *O {
+func (c *Supervisor[O, I]) DroppedMessage() *O {
 	return c.droppedMessage
 }
 
-func (c *StreamSupervisor[O, I]) Run(ctx context.Context, stream Stream[O, I]) error {
+func (c *Supervisor[O, I]) Run(ctx context.Context, stream BidiStream[O, I]) error {
 	streamCtx, cancel := context.WithCancelCause(ctx)
 	go c.transmit(stream, streamCtx, cancel)
 	go c.receive(stream, streamCtx, cancel)
@@ -35,8 +35,8 @@ func (c *StreamSupervisor[O, I]) Run(ctx context.Context, stream Stream[O, I]) e
 	return streamCtx.Err()
 }
 
-func (c *StreamSupervisor[O, I]) transmit(
-	stream Stream[O, I],
+func (c *Supervisor[O, I]) transmit(
+	stream BidiStream[O, I],
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
 ) {
@@ -54,8 +54,8 @@ func (c *StreamSupervisor[O, I]) transmit(
 	}
 }
 
-func (c *StreamSupervisor[O, I]) receive(
-	stream Stream[O, I],
+func (c *Supervisor[O, I]) receive(
+	stream BidiStream[O, I],
 	ctx context.Context,
 	cancel context.CancelCauseFunc,
 ) {

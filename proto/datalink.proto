@@ -31,9 +31,45 @@ message Confirmation {
   string error = 4;
 }
 
+message ClientHello {
+  int32 last_conf_index = 1;
+}
+
+message ClientSync {
+  repeated Message messages = 1;
+}
+
+message DatabaseCopy {
+  repeated razpravljalnica.User users = 1;
+  repeated razpravljalnica.Topic topics = 2;
+  repeated razpravljalnica.Message messages = 3;
+  repeated razpravljalnica.Like likes = 4;
+}
+
+message ServerHelo {
+  int32 last_msg_index = 1;
+}
+
+message ServerSync {
+  repeated Confirmation confirmations = 1;
+}
+
+message ClientHandshakeMsg {
+  oneof payload {
+    ClientHello hello = 1;
+    ClientSync sync = 2;
+    DatabaseCopy db = 3;
+  }
+}
+
+message ServerHandshakeMsg {
+  oneof payload {
+    ServerHelo hello = 1;
+    ServerSync sync = 2;
+  }
+}
+
 service DataLink {
-
-  // TODO: sync()
-
+  rpc Handshake(stream ClientHandshakeMsg) returns (stream ServerHandshakeMsg);
   rpc Replicate(stream Message) returns (stream Confirmation);
 }

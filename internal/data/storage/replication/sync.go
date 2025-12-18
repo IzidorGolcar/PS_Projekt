@@ -7,6 +7,8 @@ import (
 	"seminarska/proto/datalink"
 )
 
+// TODO: put timeout on pending requests!!
+
 func (h *Handler) OnMessage(message *datalink.Message) error {
 	entity, err := entities.DatalinkToEntity(message)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"seminarska/internal/common/rpc"
+	"seminarska/internal/common/stream"
 	"seminarska/proto/datalink"
 	"time"
 )
@@ -94,19 +95,19 @@ func (c *Client) superviseConnection(addr string, ctx context.Context) {
 }
 
 func (c *Client) superviseStream(link datalink.DataLinkClient, ctx context.Context) error {
-	stream, err := link.Replicate(ctx)
+	s, err := link.Replicate(ctx)
 	if err != nil {
 		return err
 	}
 	c.state.emit(successorConnect)
 	defer c.state.emit(successorDisconnect)
-	supervisor := NewStreamSupervisor(c.requests, c.replies)
+	supervisor := stream.NewSupervisor(c.requests, c.replies)
 	defer func() {
 		if supervisor.DroppedMessage() != nil {
 			panic("dropped message")
 		}
 	}()
-	return supervisor.Run(ctx, stream)
+	return supervisor.Run(ctx, s)
 }
 
 func (c *Client) SetNextNode(addr string) error {
