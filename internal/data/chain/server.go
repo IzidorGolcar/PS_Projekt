@@ -5,12 +5,11 @@ import (
 	"log"
 	"seminarska/internal/common/rpc"
 	"seminarska/internal/common/stream"
+	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/status"
 )
 
 type Server struct {
@@ -18,8 +17,14 @@ type Server struct {
 	rpcServer *rpc.Server
 }
 
-func NewServer(ctx context.Context, state *nodeDFA, addr string, buffer int) *Server {
-	l := newListener(state, buffer)
+func NewServer(
+	ctx context.Context,
+	state *nodeDFA,
+	addr string,
+	data handshake.ServerData,
+	buffer int,
+) *Server {
+	l := newListener(state, data, buffer)
 	return &Server{
 		l:         l,
 		rpcServer: rpc.NewServer(ctx, l, addr),
@@ -43,13 +48,15 @@ type listener struct {
 	inbound  chan *datalink.Message
 	datalink.UnimplementedDataLinkServer
 	state *nodeDFA
+	data  handshake.ServerData
 }
 
-func newListener(state *nodeDFA, buffer int) *listener {
+func newListener(state *nodeDFA, data handshake.ServerData, buffer int) *listener {
 	return &listener{
 		outbound: make(chan *datalink.Confirmation, buffer),
 		inbound:  make(chan *datalink.Message, buffer),
 		state:    state,
+		data:     data,
 	}
 }
 
@@ -57,8 +64,10 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 	datalink.RegisterDataLinkServer(grpcServer, l)
 }
 
-func (l *listener) Handshake(grpc.BidiStreamingServer[datalink.ClientHandshakeMsg, datalink.ServerHandshakeMsg]) error {
-	return status.Error(codes.Unimplemented, "method Handshake not implemented")
+// todo enforce single client (make sure handshake is calle before replicate by the same client)
+
+func (l *listener) Handshake(s grpc.BidiStreamingServer[datalink.ClientHandshakeMsg, datalink.ServerHandshakeMsg]) error {
+	return handshake.Server(s, l.data)
 }
 
 func (l *listener) Replicate(s grpc.BidiStreamingServer[datalink.Message, datalink.Confirmation]) error {

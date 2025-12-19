@@ -1,6 +1,9 @@
 package chain
 
-import "context"
+import (
+	"context"
+	"log"
+)
 
 //go:generate stringer -type=NodeState
 type NodeState int
@@ -13,6 +16,7 @@ const (
 	IllegalState
 )
 
+//go:generate stringer -type=event
 type event int
 
 const (
@@ -69,6 +73,7 @@ func (d *nodeDFA) onEvent(t event) {
 		case Head:
 			d.lastState = Middle
 		default:
+			logIllegalTransition(d.lastState, t)
 			d.lastState = IllegalState
 		}
 	case successorConnect:
@@ -78,6 +83,7 @@ func (d *nodeDFA) onEvent(t event) {
 		case Tail:
 			d.lastState = Middle
 		default:
+			logIllegalTransition(d.lastState, t)
 			d.lastState = IllegalState
 		}
 	case predecessorDisconnect:
@@ -87,6 +93,7 @@ func (d *nodeDFA) onEvent(t event) {
 		case Middle:
 			d.lastState = Head
 		default:
+			logIllegalTransition(d.lastState, t)
 			d.lastState = IllegalState
 		}
 	case successorDisconnect:
@@ -96,8 +103,13 @@ func (d *nodeDFA) onEvent(t event) {
 		case Middle:
 			d.lastState = Tail
 		default:
+			logIllegalTransition(d.lastState, t)
 			d.lastState = IllegalState
 		}
 	}
 	d.states <- d.lastState
+}
+
+func logIllegalTransition(state NodeState, t event) {
+	log.Printf("Illegal transition: [state: %s] [event: %s]\n", state, t)
 }

@@ -58,3 +58,8 @@ func (i Index) Replace(old, new entities.Entity) error {
 	}
 	return err
 }
+
+func (i Index) Reset() {
+	i.set = make(map[uint64]struct{})
+	i.ids = make(map[int64]struct{})
+}

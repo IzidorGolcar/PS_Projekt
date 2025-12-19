@@ -2,8 +2,8 @@ package chain
 
 import (
 	"context"
-	"errors"
 	"log"
+	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
 )
 
@@ -18,54 +18,38 @@ type MessageInterceptor interface {
 	OnConfirmation(confirmation *datalink.Confirmation)
 }
 
-// TODO will probably need some sort of confirmation (and message) replay buffer
-// message buffer can only include unconfirmed messages, conf buffer should probably
-// contain all confirmations sent since the last message arrived from the predecessor
-
 type UniversalChainNode interface {
 	MessageProducer
 	MessageInterceptor
 }
 
-type OpCounter struct {
-	n int
-}
-
-func NewOpCounter(initial int) *OpCounter {
-	return &OpCounter{n: initial}
-}
-
-func (c *OpCounter) Next() int32 {
-	current := c.n
-	c.n++
-	return int32(current)
-}
-
 type Node struct {
 	ctx         context.Context
-	interceptor MessageInterceptor
 	producer    MessageProducer
 	chainClient *Client
 	chainServer *Server
 	done        chan struct{}
 	dfa         *nodeDFA
 	counter     *OpCounter
+	interceptor *BufferedInterceptor
 }
 
 func NewNode(
 	ctx context.Context,
 	chain UniversalChainNode,
+	transfer handshake.DatabaseTransfer,
 	listenerAddress string,
 ) *Node {
 	dfa := newNodeDFA(ctx)
+	interceptor := NewBufferedInterceptor(transfer, chain)
 	n := &Node{
 		ctx:         ctx,
-		interceptor: chain,
 		producer:    chain,
 		done:        make(chan struct{}),
 		dfa:         dfa,
-		chainClient: NewClient(ctx, dfa, 1000),
-		chainServer: NewServer(ctx, dfa, listenerAddress, 1000),
+		chainClient: NewClient(ctx, dfa, interceptor, 1000),
+		chainServer: NewServer(ctx, dfa, listenerAddress, interceptor, 1000),
+		interceptor: interceptor,
 		counter:     NewOpCounter(0),
 	}
 	go n.run()
@@ -85,7 +69,6 @@ func (n *Node) run() {
 			if cancel != nil {
 				cancel()
 			}
-
 			stateCtx, cancel = context.WithCancel(n.ctx)
 			switch state {
 			case Head:
@@ -113,20 +96,9 @@ func (n *Node) runAsHead(ctx context.Context) {
 	for {
 		select {
 		case msg := <-n.producer.Messages():
-			msg.MessageIndex = n.counter.Next()
-			err := n.interceptor.OnMessage(msg)
-			if err != nil {
-				// todo n.counter.Back()
-				log.Println("Failed to process message: ", err)
-				errConf := &datalink.Confirmation{
-					MessageIndex: msg.GetMessageIndex(),
-					Ok:           false, Error: err.Error(),
-					RequestId: msg.GetRequestId(),
-				}
-				n.interceptor.OnConfirmation(errConf)
-			} else {
-				n.chainClient.Outbound() <- msg
-			}
+			_ = n.interceptor.OnMessage(msg)
+			// TODO do not forward failed messages from head (also do not increase op counter!!!)
+			n.chainClient.Outbound() <- msg
 		case conf := <-n.chainClient.Inbound():
 			n.interceptor.OnConfirmation(conf)
 		case <-ctx.Done():
@@ -139,29 +111,9 @@ func (n *Node) runAsMid(ctx context.Context) {
 	for {
 		select {
 		case msg := <-n.chainServer.Inbound():
-			// todo always forward messages in mid nodes
-			if msg.GetMessageIndex() != n.counter.Next() {
-				err := errors.New("message not synced")
-				errConf := &datalink.Confirmation{
-					MessageIndex: msg.GetMessageIndex(),
-					RequestId:    msg.GetRequestId(),
-					Ok:           false, Error: err.Error(),
-				}
-				n.interceptor.OnConfirmation(errConf)
-			}
-			err := n.interceptor.OnMessage(msg)
-			if err != nil {
-				//
-				log.Println("Failed to process message: ", err)
-				errConf := &datalink.Confirmation{
-					MessageIndex: msg.GetMessageIndex(),
-					RequestId:    msg.GetRequestId(),
-					Ok:           false, Error: err.Error(),
-				}
-				n.chainServer.Outbound() <- errConf
-			} else {
-				n.chainClient.Outbound() <- msg
-			}
+			_ = n.interceptor.OnMessage(msg)
+			// forward the message despite the error to preserve the order
+			n.chainClient.Outbound() <- msg
 		case conf := <-n.chainClient.Inbound():
 			n.interceptor.OnConfirmation(conf)
 			n.chainServer.Outbound() <- conf
@@ -175,19 +127,8 @@ func (n *Node) runAsTail(ctx context.Context) {
 	for {
 		select {
 		case msg := <-n.chainServer.Inbound():
-			if msg.GetMessageIndex() != n.counter.Next() {
-				err := errors.New("message not synced")
-				errConf := &datalink.Confirmation{
-					MessageIndex: msg.GetMessageIndex(),
-					RequestId:    msg.GetRequestId(),
-					Ok:           false, Error: err.Error(),
-				}
-				n.interceptor.OnConfirmation(errConf)
-				n.chainServer.Outbound() <- errConf
-			}
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
-				log.Println("Failed to process message: ", err)
 				errConf := &datalink.Confirmation{
 					MessageIndex: msg.GetMessageIndex(),
 					RequestId:    msg.GetRequestId(),
@@ -214,7 +155,6 @@ func (n *Node) runAsSingleNode(ctx context.Context) {
 	for {
 		select {
 		case msg := <-n.producer.Messages():
-			msg.MessageIndex = n.counter.Next()
 			err := n.interceptor.OnMessage(msg)
 			if err != nil {
 				log.Println("Failed to process message: ", err)

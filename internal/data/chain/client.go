@@ -6,6 +6,7 @@ import (
 	"log"
 	"seminarska/internal/common/rpc"
 	"seminarska/internal/common/stream"
+	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
 	"time"
 )
@@ -16,17 +17,20 @@ type Client struct {
 	addr     chan string
 	requests chan *datalink.Message
 	replies  chan *datalink.Confirmation
+	data     handshake.ClientData
 	done     chan struct{}
 }
 
 func NewClient(
 	ctx context.Context,
 	state *nodeDFA,
+	data handshake.ClientData,
 	buffer int,
 ) *Client {
 	c := &Client{
 		ctx:      ctx,
 		state:    state,
+		data:     data,
 		addr:     make(chan string),
 		requests: make(chan *datalink.Message, buffer),
 		replies:  make(chan *datalink.Confirmation, buffer),
@@ -69,15 +73,25 @@ func (c *Client) run() {
 }
 
 func (c *Client) superviseConnection(addr string, ctx context.Context) {
+	c.state.emit(successorConnect)
+	defer c.state.emit(successorDisconnect)
+
 	for {
 		log.Println("datalink connecting to ", addr)
 		rpcClient := rpc.NewClient(ctx, addr)
 		link := datalink.NewDataLinkClient(rpcClient)
 
-		// TODO: perform sync with next node, switch state
+		if err := c.doHandshake(link); err != nil {
+			log.Println("handshake failed: ", err, " retrying in 5 seconds")
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				continue
+			}
+		}
 
-		err := c.superviseStream(link, ctx)
-		if err != nil {
+		if err := c.superviseStream(link, ctx); err != nil {
 			if errors.Is(err, errAddressChange) ||
 				errors.Is(err, context.Canceled) ||
 				errors.Is(err, context.DeadlineExceeded) {
@@ -94,13 +108,19 @@ func (c *Client) superviseConnection(addr string, ctx context.Context) {
 	}
 }
 
+func (c *Client) doHandshake(link datalink.DataLinkClient) error {
+	handshakeStream, err := link.Handshake(c.ctx)
+	if err != nil {
+		return err
+	}
+	return handshake.Client(handshakeStream, c.data)
+}
+
 func (c *Client) superviseStream(link datalink.DataLinkClient, ctx context.Context) error {
 	s, err := link.Replicate(ctx)
 	if err != nil {
 		return err
 	}
-	c.state.emit(successorConnect)
-	defer c.state.emit(successorDisconnect)
 	supervisor := stream.NewSupervisor(c.requests, c.replies)
 	defer func() {
 		if supervisor.DroppedMessage() != nil {

@@ -1,9 +1,8 @@
 package chain
 
 import (
-	"context"
 	"errors"
-	"slices"
+	"math"
 	"sync"
 )
 
@@ -11,68 +10,73 @@ type Indexable interface {
 	GetMessageIndex() int32
 }
 
+const MaxSize = math.MaxInt
+
+var (
+	ErrIncompleteResult   = errors.New("incomplete result")
+	ErrIndexOutOfOrder    = errors.New("index out of order")
+	ErrNoBufferedMessages = errors.New("no buffered messages")
+)
+
 type ReplayBuffer[T Indexable] struct {
-	ctx    context.Context
-	src    <-chan T
 	buffer []T
-	dst    chan T
 	mx     *sync.RWMutex
+	size   int
 }
 
-func NewBuffer[T Indexable](ctx context.Context, src <-chan T) *ReplayBuffer[T] {
-	b := &ReplayBuffer[T]{
-		ctx: ctx,
-		src: src,
-		dst: make(chan T, 1000),
-		mx:  &sync.RWMutex{},
-	}
-	go b.run()
-	return b
+func NewReplayBuffer[T Indexable](size int) *ReplayBuffer[T] {
+	return &ReplayBuffer[T]{mx: &sync.RWMutex{}, size: size}
 }
 
-func (b *ReplayBuffer[T]) run() {
-	for {
-		select {
-		case <-b.ctx.Done():
-			return
-		case v := <-b.src:
-			b.dst <- v
-			b.mx.Lock()
-			b.buffer = append(b.buffer, v)
-			b.mx.Unlock()
-		}
-	}
-}
-
-func (b *ReplayBuffer[T]) Messages() <-chan T {
-	return b.dst
-}
-
-func (b *ReplayBuffer[T]) Clear() {
+func (b *ReplayBuffer[T]) Add(messages ...T) error {
 	b.mx.Lock()
 	defer b.mx.Unlock()
-	b.buffer = nil
+	for _, msg := range messages {
+		if len(b.buffer) > 0 && msg.GetMessageIndex() <= b.buffer[len(b.buffer)-1].GetMessageIndex() {
+			return ErrIndexOutOfOrder
+		}
+		b.buffer = append(b.buffer, msg)
+		if len(b.buffer) > b.size {
+			b.buffer = b.buffer[1:]
+		}
+	}
+	return nil
 }
 
-func (b *ReplayBuffer[T]) LastMessageIndex() (i int32, err error) {
+func (b *ReplayBuffer[T]) LastMessageIndex() (int32, error) {
 	b.mx.RLock()
 	defer b.mx.RUnlock()
 	if len(b.buffer) == 0 {
-		err = errors.New("no buffered messages")
-		return
+		return 0, ErrNoBufferedMessages
 	}
-	i = b.buffer[len(b.buffer)-1].GetMessageIndex()
-	return
+	return b.buffer[len(b.buffer)-1].GetMessageIndex(), nil
 }
 
-func (b *ReplayBuffer[T]) MessagesAfter(index int32) (out []T) {
-	for _, msg := range b.buffer {
+func (b *ReplayBuffer[T]) MessagesAfter(index int32) ([]T, error) {
+	b.mx.RLock()
+	defer b.mx.RUnlock()
+	for i, msg := range b.buffer {
+		if msg.GetMessageIndex() == index {
+			if i == len(b.buffer)-1 {
+				return []T{}, nil
+			}
+			return b.buffer[i+1:], nil
+		}
 		if msg.GetMessageIndex() > index {
-			out = append(out, msg)
+			return b.buffer[i:], ErrIncompleteResult
 		}
 	}
-	slices.SortFunc(out, func(a, b T) int {
-		return int(a.GetMessageIndex()) - int(b.GetMessageIndex())
-	})
-	return
+	return nil, ErrNoBufferedMessages
+}
+
+func (b *ReplayBuffer[T]) ClearBefore(index int32) {
+	b.mx.Lock()
+	defer b.mx.Unlock()
+	for i, msg := range b.buffer {
+		if msg.GetMessageIndex() == index {
+			b.buffer = b.buffer[i:]
+		} else if msg.GetMessageIndex() > index {
+			return
+		}
+	}
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"seminarska/internal/common/rpc"
 	"seminarska/proto/controllink"
 )
@@ -11,8 +13,15 @@ import (
 // 2. 5990	5991    5992
 
 func main() {
-	link(":5971", ":5980")
-	link(":5981", ":5990")
+	for {
+		sources := []string{":5971", ":5981", ":5991"}
+		targets := []string{":5970", ":5980", ":5990"}
+
+		var src, tgt int
+		fmt.Scanf("%d %d", &src, &tgt)
+
+		link(sources[src-1], targets[tgt-1])
+	}
 }
 
 func link(src, target string) {
@@ -21,6 +30,7 @@ func link(src, target string) {
 	control := controllink.NewControlServiceClient(client)
 	_, err := control.SwitchSuccessor(ctx, &controllink.SwitchSuccessorCommand{Address: target})
 	if err != nil {
-		panic(err)
+		log.Println(err)
 	}
+	log.Println("Successor switched")
 }

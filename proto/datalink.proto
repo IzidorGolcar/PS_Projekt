@@ -31,6 +31,7 @@ message Confirmation {
   string error = 4;
 }
 
+
 message ClientHello {
   int32 last_conf_index = 1;
 }
@@ -39,15 +40,17 @@ message ClientSync {
   repeated Message messages = 1;
 }
 
-message DatabaseCopy {
-  repeated razpravljalnica.User users = 1;
-  repeated razpravljalnica.Topic topics = 2;
-  repeated razpravljalnica.Message messages = 3;
-  repeated razpravljalnica.Like likes = 4;
+message DatabaseSnapshot {
+  int32 op_count = 1;
+  repeated razpravljalnica.User users = 2;
+  repeated razpravljalnica.Topic topics = 3;
+  repeated razpravljalnica.Message messages = 4;
+  repeated razpravljalnica.Like likes = 5;
 }
 
 message ServerHelo {
   int32 last_msg_index = 1;
+  bool request_transfer = 2;
 }
 
 message ServerSync {
@@ -58,7 +61,7 @@ message ClientHandshakeMsg {
   oneof payload {
     ClientHello hello = 1;
     ClientSync sync = 2;
-    DatabaseCopy db = 3;
+    DatabaseSnapshot db = 3;
   }
 }
 
