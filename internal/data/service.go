@@ -26,8 +26,14 @@ func NewService(ctx context.Context, config config.NodeConfig) *Service {
 		database:       database,
 		requestsServer: requests.NewServer(ctx, database, config.ServiceAddress),
 		control:        control.NewServer(ctx, config.ControlListenerAddress),
-		node:           chain.NewNode(ctx, database.Chain(), database, config.ChainListenerAddress),
-		done:           make(chan struct{}),
+		node: chain.NewNode(
+			ctx,
+			database.ReplicationHandler(),
+			database.ReplicationHandler(),
+			database,
+			config.ChainListenerAddress,
+		),
+		done: make(chan struct{}),
 	}
 	go s.run()
 	return s

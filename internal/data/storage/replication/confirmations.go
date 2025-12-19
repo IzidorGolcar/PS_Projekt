@@ -11,7 +11,7 @@ func (h *Handler) OnConfirmation(confirmation *datalink.Confirmation) {
 	if !confirmation.Ok {
 		err = errors.New(confirmation.GetError())
 	}
-	h.broadcast.Broadcast(newResponse(
+	h.confirmationBroadcast.Broadcast(newResponse(
 		confirmation.GetRequestId(),
 		int64(confirmation.GetMessageIndex()),
 		err,

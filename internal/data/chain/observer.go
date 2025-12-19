@@ -53,9 +53,9 @@ func NewBufferedInterceptor(
 }
 
 func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
-	log.Println("Received message: ", message)
 	// todo verify message index if not the head
 	message.MessageIndex = o.opCounter.Next()
+	log.Println("Received message: ", message.MessageIndex)
 	if err := o.messages.Add(message); err != nil {
 		panic("illegal state")
 	}
@@ -63,7 +63,7 @@ func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
 }
 
 func (o *BufferedInterceptor) OnConfirmation(confirmation *datalink.Confirmation) {
-	log.Println("Received confirmation: ", confirmation)
+	log.Println("Received confirmation: ", confirmation.GetMessageIndex())
 	if err := o.confirmations.Add(confirmation); err != nil {
 		panic(err)
 	}
@@ -74,8 +74,7 @@ func (o *BufferedInterceptor) OnConfirmation(confirmation *datalink.Confirmation
 func (o *BufferedInterceptor) GetMessagesAfter(i int32) []*datalink.Message {
 	messages, err := o.messages.MessagesAfter(i)
 	if err != nil {
-		// TODO handle error
-		panic("not implemented")
+		log.Fatalln(err)
 	}
 	return messages
 }
@@ -83,8 +82,7 @@ func (o *BufferedInterceptor) GetMessagesAfter(i int32) []*datalink.Message {
 func (o *BufferedInterceptor) GetConfirmationsAfter(i int32) []*datalink.Confirmation {
 	confirmations, err := o.confirmations.MessagesAfter(i)
 	if err != nil {
-		// TODO handle error - send failed confirmations
-		panic(err)
+		log.Fatalln(err)
 	}
 	return confirmations
 }
@@ -98,7 +96,7 @@ func (o *BufferedInterceptor) ProcessMessages(messages []*datalink.Message) {
 	}
 	err := o.messages.Add(messages...)
 	if err != nil {
-		panic("illegal state")
+		log.Fatalln("Illegal state: ", err)
 	}
 }
 
@@ -108,7 +106,7 @@ func (o *BufferedInterceptor) ProcessConfirmations(confirmations []*datalink.Con
 	}
 	err := o.confirmations.Add(confirmations...)
 	if err != nil {
-		panic("illegal state")
+		log.Fatalln("Illegal state: ", err)
 	}
 }
 

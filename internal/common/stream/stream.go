@@ -3,7 +3,6 @@ package stream
 import (
 	"context"
 	"errors"
-	"log"
 )
 
 type BidiStream[Req any, Res any] interface {
@@ -46,9 +45,7 @@ func (c *Supervisor[O, I]) transmit(
 		case <-ctx.Done():
 			return
 		case msg := <-c.outbound:
-			log.Println("sending to stream: ", msg)
 			if err := stream.Send(msg); err != nil {
-				log.Println("failed to send to stream: ", err)
 				c.droppedMessage = &msg
 				cancel(errors.Join(errors.New("failed to send message"), err))
 				return
@@ -65,11 +62,9 @@ func (c *Supervisor[O, I]) receive(
 	for {
 		msg, err := stream.Recv()
 		if err != nil {
-			log.Println("failed to receive from stream: ", err)
 			cancel(errors.Join(errors.New("failed to receive confirmation"), err))
 			return
 		}
-		log.Println("received from stream: ", msg)
 		c.inbound <- msg
 		select {
 		case <-ctx.Done():

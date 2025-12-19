@@ -12,7 +12,7 @@ type NodeConfig struct {
 func Load() NodeConfig {
 	id := flag.String("id", "data-node", "Node ID")
 	serviceAddress := flag.String("service", ":0", "Service address")
-	chainListenerAddress := flag.String("chain", ":0", "Chain listener address")
+	chainListenerAddress := flag.String("chain", ":0", "ReplicationHandler listener address")
 	controlListenerAddress := flag.String("control", ":0", "Control listener address")
 	flag.Parse()
 

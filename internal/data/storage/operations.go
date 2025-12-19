@@ -87,10 +87,10 @@ func (d *AppDatabase) DeleteMessage(ctx context.Context, userId, messageId int64
 
 func (d *AppDatabase) UpdateMessage(ctx context.Context, userId, messageId int64, newText string) (*entities.Message, error) {
 	updated, err := d.Messages().GetTransform(messageId, func(og *entities.Message) (*entities.Message, error) {
-		if og.UserId() != userId {
+		if og.UserId != userId {
 			return nil, errors.New("user mismatch")
 		}
-		msg := entities.NewMessage(og.TopicId(), og.UserId(), newText, og.CreatedAt())
+		msg := entities.NewMessage(og.TopicId, og.UserId, newText, og.CreatedAt)
 		msg.SetId(og.Id())
 		return msg, nil
 	})
@@ -103,4 +103,28 @@ func (d *AppDatabase) UpdateMessage(ctx context.Context, userId, messageId int64
 		return nil, err
 	}
 	return d.Messages().Get(id)
+}
+
+func (d *AppDatabase) SubscribeTopic(ctx context.Context, topics []int64) <-chan *entities.Message {
+	out := make(chan *entities.Message, 100)
+	go func() {
+		defer close(out)
+		for dl := range d.chain.Observe(ctx) {
+			e, err := entities.DatalinkToEntity(dl)
+			if err != nil {
+				continue
+			}
+			if msg, ok := e.(*entities.Message); ok &&
+				(dl.Op == datalink.Operation_Create ||
+					dl.Op == datalink.Operation_Update) {
+
+				for _, t := range topics {
+					if t == msg.TopicId {
+						out <- msg
+					}
+				}
+			}
+		}
+	}()
+	return out
 }

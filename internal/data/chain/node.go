@@ -29,28 +29,27 @@ type Node struct {
 	chainClient *Client
 	chainServer *Server
 	done        chan struct{}
-	dfa         *nodeDFA
-	counter     *OpCounter
+	state       *nodeDFA
 	interceptor *BufferedInterceptor
 }
 
 func NewNode(
 	ctx context.Context,
-	chain UniversalChainNode,
+	messageProducer MessageProducer,
+	messageInterceptor MessageInterceptor,
 	transfer handshake.DatabaseTransfer,
 	listenerAddress string,
 ) *Node {
 	dfa := newNodeDFA(ctx)
-	interceptor := NewBufferedInterceptor(transfer, chain)
+	interceptor := NewBufferedInterceptor(transfer, messageInterceptor)
 	n := &Node{
 		ctx:         ctx,
-		producer:    chain,
+		producer:    messageProducer,
 		done:        make(chan struct{}),
-		dfa:         dfa,
+		state:       dfa,
 		chainClient: NewClient(ctx, dfa, interceptor, 1000),
 		chainServer: NewServer(ctx, dfa, listenerAddress, interceptor, 1000),
 		interceptor: interceptor,
-		counter:     NewOpCounter(0),
 	}
 	go n.run()
 	return n
@@ -64,7 +63,7 @@ func (n *Node) run() {
 	)
 	for {
 		select {
-		case state := <-n.dfa.state():
+		case state := <-n.state.state():
 			log.Println("Switching to state: ", state)
 			if cancel != nil {
 				cancel()

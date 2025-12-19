@@ -93,8 +93,7 @@ func (c *Client) superviseConnection(addr string, ctx context.Context) {
 
 		if err := c.superviseStream(link, ctx); err != nil {
 			if errors.Is(err, errAddressChange) ||
-				errors.Is(err, context.Canceled) ||
-				errors.Is(err, context.DeadlineExceeded) {
+				errors.Is(err, context.Canceled) {
 				return
 			}
 			log.Println("connection failed: ", err, " retrying in 5 seconds")

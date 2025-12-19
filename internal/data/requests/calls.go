@@ -145,6 +145,17 @@ func (l *listener) SubscribeTopic(
 	request *razpravljalnica.SubscribeTopicRequest,
 	g grpc.ServerStreamingServer[razpravljalnica.MessageEvent],
 ) error {
-	//TODO implement me
-	panic("implement me")
+	for msg := range l.db.SubscribeTopic(g.Context(), request.GetTopicId()) {
+		rMessage := &razpravljalnica.MessageEvent{Message: entities.EntityToDatalink(msg).GetMessage()}
+		likes, err := l.db.GetLikes(msg.Id())
+		if err != nil {
+			return err
+		}
+		rMessage.Message.Likes = int32(likes)
+		err = g.Send(rMessage)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

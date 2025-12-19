@@ -44,10 +44,10 @@ func EntityToDatalink(entity Entity) (dl *datalink.Message) {
 		return &datalink.Message{
 			Payload: &datalink.Message_Message{Message: &razpravljalnica.Message{
 				Id:        e.id,
-				TopicId:   e.topicId,
-				UserId:    e.userId,
-				Text:      e.text,
-				CreatedAt: timestamppb.New(e.createdAt),
+				TopicId:   e.TopicId,
+				UserId:    e.UserId,
+				Text:      e.Text,
+				CreatedAt: timestamppb.New(e.CreatedAt),
 			}},
 		}
 	case *Topic:

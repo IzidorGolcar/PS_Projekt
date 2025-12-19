@@ -44,7 +44,7 @@ func (s *Server) run() {
 
 func (s *Server) handleShutdown() {
 	<-s.ctx.Done()
-	s.s.GracefulStop()
+	s.s.Stop()
 }
 
 func (s *Server) serve() {
