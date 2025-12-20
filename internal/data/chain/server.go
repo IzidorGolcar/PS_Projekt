@@ -67,6 +67,7 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 // todo enforce single client (make sure handshake is calle before replicate by the same client)
 
 func (l *listener) Handshake(s grpc.BidiStreamingServer[datalink.ClientHandshakeMsg, datalink.ServerHandshakeMsg]) error {
+	// todo drop any existing connection
 	return handshake.Server(s, l.data)
 }
 

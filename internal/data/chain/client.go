@@ -8,6 +8,7 @@ import (
 	"seminarska/internal/common/stream"
 	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
+	"sync"
 	"time"
 )
 
@@ -53,15 +54,22 @@ func (c *Client) run() {
 		cancel        context.CancelCauseFunc
 	)
 
+	connectionMutex := &sync.Mutex{}
+
 	for {
 		select {
 		case addr := <-c.addr:
 			if cancel != nil {
 				cancel(errAddressChange)
+				// todo wait for disconnect
 			}
 			if addr != "" {
 				connectionCtx, cancel = context.WithCancelCause(c.ctx)
-				go c.superviseConnection(addr, connectionCtx)
+				go func() {
+					connectionMutex.Lock()
+					defer connectionMutex.Unlock()
+					c.superviseConnection(addr, connectionCtx)
+				}()
 			}
 		case <-c.ctx.Done():
 			if cancel != nil {

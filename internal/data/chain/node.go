@@ -18,11 +18,6 @@ type MessageInterceptor interface {
 	OnConfirmation(confirmation *datalink.Confirmation)
 }
 
-type UniversalChainNode interface {
-	MessageProducer
-	MessageInterceptor
-}
-
 type Node struct {
 	ctx         context.Context
 	producer    MessageProducer
@@ -96,7 +91,6 @@ func (n *Node) runAsHead(ctx context.Context) {
 		select {
 		case msg := <-n.producer.Messages():
 			_ = n.interceptor.OnMessage(msg)
-			// TODO do not forward failed messages from head (also do not increase op counter!!!)
 			n.chainClient.Outbound() <- msg
 		case conf := <-n.chainClient.Inbound():
 			n.interceptor.OnConfirmation(conf)
@@ -111,7 +105,6 @@ func (n *Node) runAsMid(ctx context.Context) {
 		select {
 		case msg := <-n.chainServer.Inbound():
 			_ = n.interceptor.OnMessage(msg)
-			// forward the message despite the error to preserve the order
 			n.chainClient.Outbound() <- msg
 		case conf := <-n.chainClient.Inbound():
 			n.interceptor.OnConfirmation(conf)
