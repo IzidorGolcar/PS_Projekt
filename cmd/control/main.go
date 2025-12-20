@@ -8,9 +8,9 @@ import (
 	"seminarska/proto/controllink"
 )
 
-//    ReplicationHandler	Control Data
-// 1. 5980  5981    5982
-// 2. 5990	5991    5992
+// **************************************
+// 			MOCK CONTROL SERVICE
+// **************************************
 
 func main() {
 	for {

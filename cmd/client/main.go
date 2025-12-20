@@ -16,6 +16,10 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
+// *************************************
+// 				MOCK CLIENT
+// *************************************
+
 var nodes = []string{":5972", ":5982", ":5992"}
 
 func main() {

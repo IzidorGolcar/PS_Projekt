@@ -2,11 +2,14 @@ package chain
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
 	"seminarska/internal/common/rpc"
 	"seminarska/internal/common/stream"
 	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
+	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/peer"
@@ -43,15 +46,29 @@ func (s *Server) Done() <-chan struct{} {
 	return s.rpcServer.Done()
 }
 
-type listener struct {
-	outbound chan *datalink.Confirmation
-	inbound  chan *datalink.Message
-	datalink.UnimplementedDataLinkServer
-	state *nodeDFA
-	data  handshake.ServerData
+type session struct {
+	addr          net.Addr
+	cancel        context.CancelCauseFunc
+	ctx           context.Context
+	handshakeDone chan struct{}
 }
 
-func newListener(state *nodeDFA, data handshake.ServerData, buffer int) *listener {
+type listener struct {
+	datalink.UnimplementedDataLinkServer
+	outbound chan *datalink.Confirmation
+	inbound  chan *datalink.Message
+	state    *nodeDFA
+	data     handshake.ServerData
+
+	mx             sync.Mutex
+	currentSession *session
+}
+
+func newListener(
+	state *nodeDFA,
+	data handshake.ServerData,
+	buffer int,
+) *listener {
 	return &listener{
 		outbound: make(chan *datalink.Confirmation, buffer),
 		inbound:  make(chan *datalink.Message, buffer),
@@ -64,27 +81,64 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 	datalink.RegisterDataLinkServer(grpcServer, l)
 }
 
-// todo enforce single client (make sure handshake is calle before replicate by the same client)
+func (l *listener) Handshake(s datalink.DataLink_HandshakeServer) error {
+	p, ok := peer.FromContext(s.Context())
+	if !ok {
+		return errors.New("no peer info")
+	}
 
-func (l *listener) Handshake(s grpc.BidiStreamingServer[datalink.ClientHandshakeMsg, datalink.ServerHandshakeMsg]) error {
-	// todo drop any existing connection
-	return handshake.Server(s, l.data)
+	newSess := &session{
+		addr:          p.Addr,
+		handshakeDone: make(chan struct{}),
+	}
+	newSess.ctx, newSess.cancel = context.WithCancelCause(s.Context())
+
+	l.mx.Lock()
+	if l.currentSession != nil {
+		log.Printf("Replacing connection: %s -> %s\n", l.currentSession.addr.String(), p.Addr.String())
+		l.currentSession.cancel(errors.New("connection replaced by new client"))
+	}
+	l.currentSession = newSess
+	l.mx.Unlock()
+
+	err := handshake.Server(s, l.data)
+	if err != nil {
+		return err
+	}
+
+	close(newSess.handshakeDone)
+
+	<-newSess.ctx.Done()
+	return context.Cause(newSess.ctx)
 }
 
-func (l *listener) Replicate(s grpc.BidiStreamingServer[datalink.Message, datalink.Confirmation]) error {
+func (l *listener) Replicate(s datalink.DataLink_ReplicateServer) error {
+	p, ok := peer.FromContext(s.Context())
+	if !ok {
+		return errors.New("no peer info")
+	}
+
+	l.mx.Lock()
+	sess := l.currentSession
+
+	if sess == nil || sess.addr.String() != p.Addr.String() {
+		l.mx.Unlock()
+		return errors.New("handshake required before replication")
+	}
+	l.mx.Unlock()
+
+	select {
+	case <-sess.handshakeDone:
+	case <-s.Context().Done():
+		return s.Context().Err()
+	case <-sess.ctx.Done():
+		return context.Cause(sess.ctx)
+	}
+
 	l.state.emit(predecessorConnect)
 	defer l.state.emit(predecessorDisconnect)
-	if p, ok := peer.FromContext(s.Context()); ok {
-		log.Println("New node connected:", p.Addr.String())
-	} else {
-		log.Println("New node connected")
-	}
-	ctx := s.Context()
+
 	supervisor := stream.NewSupervisor(l.outbound, l.inbound)
-	defer func() {
-		if supervisor.DroppedMessage() != nil {
-			panic("dropped message")
-		}
-	}()
-	return supervisor.Run(ctx, s)
+
+	return supervisor.Run(sess.ctx, s)
 }
