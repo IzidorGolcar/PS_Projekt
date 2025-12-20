@@ -37,7 +37,7 @@ func EntityToDatalink(entity Entity) (dl *datalink.Message) {
 		return &datalink.Message{
 			Payload: &datalink.Message_User{User: &razpravljalnica.User{
 				Id:   e.id,
-				Name: e.name,
+				Name: e.Name,
 			}},
 		}
 	case *Message:
@@ -54,14 +54,14 @@ func EntityToDatalink(entity Entity) (dl *datalink.Message) {
 		return &datalink.Message{
 			Payload: &datalink.Message_Topic{Topic: &razpravljalnica.Topic{
 				Id:   e.id,
-				Name: e.name,
+				Name: e.Name,
 			}},
 		}
 	case *Like:
 		return &datalink.Message{
 			Payload: &datalink.Message_Like{Like: &razpravljalnica.Like{
-				MessageId: e.messageId,
-				UserId:    e.userId,
+				MessageId: e.MessageId,
+				UserId:    e.UserId,
 			}},
 		}
 	default:

@@ -25,7 +25,7 @@ func (d *AppDatabase) GetMessages(fromId int64, limit int32) ([]*entities.Messag
 
 func (d *AppDatabase) GetLikes(messageId int64) (int, error) {
 	likes, err := d.Likes().GetPredicate(func(like *entities.Like) bool {
-		return like.MessageId() == messageId
+		return like.MessageId == messageId
 	}, db.NoLimit)
 	if err != nil {
 		return 0, err
