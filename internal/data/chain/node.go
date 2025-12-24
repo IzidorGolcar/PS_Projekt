@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"seminarska/internal/data/chain/handshake"
+	"seminarska/proto/controllink"
 	"seminarska/proto/datalink"
 )
 
@@ -24,7 +25,7 @@ type Node struct {
 	chainClient *Client
 	chainServer *Server
 	done        chan struct{}
-	state       *nodeDFA
+	state       *NodeDFA
 	interceptor *BufferedInterceptor
 }
 
@@ -35,7 +36,7 @@ func NewNode(
 	transfer handshake.DatabaseTransfer,
 	listenerAddress string,
 ) *Node {
-	dfa := newNodeDFA(ctx)
+	dfa := NewNodeDFA()
 	interceptor := NewBufferedInterceptor(transfer, messageInterceptor)
 	n := &Node{
 		ctx:         ctx,
@@ -56,25 +57,28 @@ func (n *Node) run() {
 		stateCtx context.Context
 		cancel   context.CancelFunc
 	)
+
+	// FIXME when successor disconnect node automatically starts confirming requests.
+	// this is not the desired effect unless the successor was tail.
+	// Node should be explicitly given a tail role.
+
 	for {
 		select {
-		case state := <-n.state.state():
-			log.Println("Switching to state: ", state)
+		case state := <-n.state.States():
+			log.Println("Switching to state:", state)
 			if cancel != nil {
 				cancel()
 			}
 			stateCtx, cancel = context.WithCancel(n.ctx)
-			switch state {
-			case Head:
+			switch state.Role {
+			case Reader:
 				go n.runAsHead(stateCtx)
-			case Middle:
+			case Relay:
 				go n.runAsMid(stateCtx)
-			case Tail:
+			case Confirmer:
 				go n.runAsTail(stateCtx)
-			case SingleNode:
+			case ReaderConfirmer:
 				go n.runAsSingleNode(stateCtx)
-			case IllegalState:
-				panic("Illegal node state")
 			}
 		case <-n.ctx.Done():
 			log.Println("Shutting down node")
@@ -169,6 +173,21 @@ func (n *Node) runAsSingleNode(ctx context.Context) {
 
 func (n *Node) SetNextNode(addr string) error {
 	return n.chainClient.SetNextNode(addr)
+}
+
+func (n *Node) SetRole(role controllink.NodeRole) error {
+	switch role {
+	case controllink.NodeRole_Relay:
+		return n.state.Emit(RoleRelay)
+	case controllink.NodeRole_MessageConfirmer:
+		return n.state.Emit(RoleConfirmer)
+	case controllink.NodeRole_MessageReader:
+		return n.state.Emit(RoleReader)
+	case controllink.NodeRole_MessageReaderConfirmer:
+		return n.state.Emit(RoleReaderConfirmer)
+	default:
+		panic("illegal state")
+	}
 }
 
 func (n *Node) Done() <-chan struct{} {

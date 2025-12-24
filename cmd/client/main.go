@@ -111,7 +111,7 @@ func subscribe(node int) {
 }
 
 func createTopic(client razpravljalnica.MessageBoardClient, name string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	topic, err := client.CreateTopic(ctx, &razpravljalnica.CreateTopicRequest{
@@ -141,7 +141,7 @@ func postMessage(
 	topic int64,
 	text string,
 ) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	msg, err := client.PostMessage(ctx, &razpravljalnica.PostMessageRequest{

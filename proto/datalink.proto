@@ -46,6 +46,7 @@ message DatabaseSnapshot {
   repeated razpravljalnica.Topic topics = 3;
   repeated razpravljalnica.Message messages = 4;
   repeated razpravljalnica.Like likes = 5;
+  repeated Message pending_requests = 6;
 }
 
 message ServerHelo {

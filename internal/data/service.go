@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"log"
 	"seminarska/internal/data/chain"
 	"seminarska/internal/data/config"
 	"seminarska/internal/data/control"
@@ -21,44 +20,22 @@ type Service struct {
 
 func NewService(ctx context.Context, config config.NodeConfig) *Service {
 	database := storage.NewAppDatabase()
+	node := chain.NewNode(
+		ctx,
+		database.ReplicationHandler(),
+		database.ReplicationHandler(),
+		database,
+		config.ChainListenerAddress,
+	)
 	s := &Service{
 		ctx:            ctx,
 		database:       database,
 		requestsServer: requests.NewServer(ctx, database, config.ServiceAddress),
-		control:        control.NewServer(ctx, config.ControlListenerAddress),
-		node: chain.NewNode(
-			ctx,
-			database.ReplicationHandler(),
-			database.ReplicationHandler(),
-			database,
-			config.ChainListenerAddress,
-		),
-		done: make(chan struct{}),
+		control:        control.NewServer(ctx, config.ControlListenerAddress, node),
+		node:           node,
+		done:           make(chan struct{}),
 	}
-	go s.run()
 	return s
-}
-
-func (n *Service) run() {
-	defer close(n.done)
-	for {
-		select {
-		case <-n.ctx.Done():
-			return
-		case cmd := <-n.control.Commands():
-			n.execute(cmd)
-		}
-	}
-}
-
-func (n *Service) execute(cmd control.Command) {
-	switch cmd := cmd.(type) {
-	case control.SwitchSuccessorCommand:
-		err := n.node.SetNextNode(cmd.NewAddress)
-		if err != nil {
-			log.Println("Failed to switch successor:", err)
-		}
-	}
 }
 
 func (n *Service) Done() <-chan struct{} {

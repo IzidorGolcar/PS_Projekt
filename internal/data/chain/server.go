@@ -22,7 +22,7 @@ type Server struct {
 
 func NewServer(
 	ctx context.Context,
-	state *nodeDFA,
+	state *NodeDFA,
 	addr string,
 	data handshake.ServerData,
 	buffer int,
@@ -57,7 +57,7 @@ type listener struct {
 	datalink.UnimplementedDataLinkServer
 	outbound chan *datalink.Confirmation
 	inbound  chan *datalink.Message
-	state    *nodeDFA
+	state    *NodeDFA
 	data     handshake.ServerData
 
 	mx             sync.Mutex
@@ -65,7 +65,7 @@ type listener struct {
 }
 
 func newListener(
-	state *nodeDFA,
+	state *NodeDFA,
 	data handshake.ServerData,
 	buffer int,
 ) *listener {
@@ -135,8 +135,14 @@ func (l *listener) Replicate(s datalink.DataLink_ReplicateServer) error {
 		return context.Cause(sess.ctx)
 	}
 
-	l.state.emit(predecessorConnect)
-	defer l.state.emit(predecessorDisconnect)
+	if err := l.state.Emit(PredecessorConnect); err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := l.state.Emit(PredecessorDisconnect); err != nil {
+			panic(err)
+		}
+	}()
 
 	supervisor := stream.NewSupervisor(l.outbound, l.inbound)
 

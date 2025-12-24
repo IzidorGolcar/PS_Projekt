@@ -5,10 +5,22 @@ option go_package = "seminarska/proto/controllink";
 
 import "google/protobuf/empty.proto";
 
+enum NodeRole {
+  Relay = 0; // node will pass messages from predecessor to successor
+  MessageReader = 1; // node will read client's requests
+  MessageConfirmer = 2; // node will confirm messages
+  MessageReaderConfirmer = 3; // node will read and client's requests
+}
+
 message SwitchSuccessorCommand {
   string Address = 1; // empty string for disconnect
 }
 
+message SwitchRoleCommand {
+  NodeRole role = 1;
+}
+
 service ControlService {
   rpc SwitchSuccessor(SwitchSuccessorCommand) returns (google.protobuf.Empty);
+  rpc SwitchRole(SwitchRoleCommand) returns (google.protobuf.Empty);
 }

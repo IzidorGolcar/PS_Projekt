@@ -78,7 +78,6 @@ func NewMutableRecord[E entities.Entity]() *MutableRecord[E] {
 
 func (r *MutableRecord[E]) Delete() {
 	r.dirtyMx.Lock()
-	r.initialized = true
 	r.dirtyValue.e = r.confirmedValue.e
 	r.dirtyValue.deleted = true
 	r.dirty = true
@@ -90,7 +89,6 @@ func (r *MutableRecord[E]) Write(value E) error {
 		r.dirtyMx.Unlock()
 		return ErrDeleted
 	}
-	r.initialized = true
 	r.dirty = true
 	r.dirtyValue.e = value
 	return nil
@@ -101,6 +99,7 @@ func (r *MutableRecord[E]) Commit() error {
 		return ErrNotDirty
 	}
 	r.confirmedValue = r.dirtyValue
+	r.initialized = true
 	r.dirty = false
 	r.dirtyMx.Unlock()
 	return nil

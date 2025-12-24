@@ -1,115 +1,152 @@
 package chain
 
 import (
-	"context"
-	"log"
+	"fmt"
+	"sync"
 )
 
-//go:generate stringer -type=NodeState
-type NodeState int
+type NodeState struct {
+	Position
+	Role
+	illegal bool
+}
+
+func NewNodeState(position Position, role Role) NodeState {
+	return NodeState{Position: position, Role: role}
+}
+
+func (s NodeState) String() string {
+	if s.illegal {
+		return "(Illegal)"
+	}
+	return fmt.Sprintf("(%s; %s)", s.Position, s.Role)
+}
+
+//go:generate stringer -type=Position
+type Position int
 
 const (
-	Head NodeState = iota
+	Head Position = iota
 	Middle
 	Tail
-	SingleNode
-	IllegalState
+	Single
+)
+
+//go:generate stringer -type=Role
+type Role int
+
+const (
+	Relay Role = iota
+	Reader
+	Confirmer
+	ReaderConfirmer
 )
 
 //go:generate stringer -type=event
 type event int
 
 const (
-	predecessorConnect event = iota
-	successorConnect
-	predecessorDisconnect
-	successorDisconnect
+	PredecessorConnect event = iota
+	SuccessorConnect
+	PredecessorDisconnect
+	SuccessorDisconnect
+	RoleRelay
+	RoleReader
+	RoleConfirmer
+	RoleReaderConfirmer
 )
 
-type nodeDFA struct {
-	ctx       context.Context
-	events    chan event
+type NodeDFA struct {
+	mx        *sync.Mutex
 	states    chan NodeState
 	lastState NodeState
 }
 
-func newNodeDFA(ctx context.Context) *nodeDFA {
-	s := &nodeDFA{
-		events:    make(chan event, 1),
+func NewNodeDFA() *NodeDFA {
+	s := &NodeDFA{
 		states:    make(chan NodeState, 1),
-		ctx:       ctx,
-		lastState: SingleNode,
+		lastState: NewNodeState(Single, ReaderConfirmer),
 	}
-	go s.run()
 	return s
 }
 
-func (d *nodeDFA) run() {
-	d.states <- d.lastState
-	for {
-		select {
-		case <-d.ctx.Done():
-			return
-		case t := <-d.events:
-			d.onEvent(t)
-		}
-	}
-}
-
-func (d *nodeDFA) state() <-chan NodeState {
+func (d *NodeDFA) States() <-chan NodeState {
 	return d.states
 }
 
-func (d *nodeDFA) emit(e event) {
-	d.events <- e
-}
-
-func (d *nodeDFA) onEvent(t event) {
-	switch t {
-	case predecessorConnect:
-		switch d.lastState {
-		case SingleNode:
-			d.lastState = Tail
+func (d *NodeDFA) Emit(e event) error {
+	switch e {
+	case PredecessorConnect:
+		if d.lastState.Role == ReaderConfirmer ||
+			d.lastState.Role == Reader {
+			return illegalTransitionError(d.lastState, e)
+		}
+		switch d.lastState.Position {
+		case Single:
+			d.lastState.Position = Tail
 		case Head:
-			d.lastState = Middle
+			d.lastState.Position = Middle
 		default:
-			logIllegalTransition(d.lastState, t)
-			d.lastState = IllegalState
+			return illegalTransitionError(d.lastState, e)
 		}
-	case successorConnect:
-		switch d.lastState {
-		case SingleNode:
-			d.lastState = Head
+	case SuccessorConnect:
+		if d.lastState.Role == ReaderConfirmer ||
+			d.lastState.Role == Confirmer {
+			return illegalTransitionError(d.lastState, e)
+		}
+		switch d.lastState.Position {
+		case Single:
+			d.lastState.Position = Head
 		case Tail:
-			d.lastState = Middle
+			d.lastState.Position = Middle
 		default:
-			logIllegalTransition(d.lastState, t)
-			d.lastState = IllegalState
+			return illegalTransitionError(d.lastState, e)
 		}
-	case predecessorDisconnect:
-		switch d.lastState {
+	case PredecessorDisconnect:
+		switch d.lastState.Position {
 		case Tail:
-			d.lastState = SingleNode
+			d.lastState.Position = Single
 		case Middle:
-			d.lastState = Head
+			d.lastState.Position = Head
 		default:
-			logIllegalTransition(d.lastState, t)
-			d.lastState = IllegalState
+			return illegalTransitionError(d.lastState, e)
 		}
-	case successorDisconnect:
-		switch d.lastState {
+	case SuccessorDisconnect:
+		switch d.lastState.Position {
 		case Head:
-			d.lastState = SingleNode
+			d.lastState.Position = Single
 		case Middle:
-			d.lastState = Tail
+			d.lastState.Position = Tail
 		default:
-			logIllegalTransition(d.lastState, t)
-			d.lastState = IllegalState
+			return illegalTransitionError(d.lastState, e)
 		}
+	case RoleConfirmer:
+		if d.lastState.Position == Single ||
+			d.lastState.Position == Tail {
+			d.lastState.Role = Confirmer
+		} else {
+			return illegalTransitionError(d.lastState, e)
+		}
+	case RoleReader:
+		if d.lastState.Position == Single ||
+			d.lastState.Position == Head {
+			d.lastState.Role = Reader
+		} else {
+			return illegalTransitionError(d.lastState, e)
+		}
+	case RoleReaderConfirmer:
+		if d.lastState.Position == Single {
+			d.lastState.Role = ReaderConfirmer
+		} else {
+			return illegalTransitionError(d.lastState, e)
+		}
+	case RoleRelay:
+		d.lastState.Role = Relay
 	}
 	d.states <- d.lastState
+	return nil
 }
 
-func logIllegalTransition(state NodeState, t event) {
-	log.Printf("Illegal transition: [state: %s] [event: %s]\n", state, t)
+func illegalTransitionError(state NodeState, t event) error {
+	return fmt.Errorf("illegal transition: %s%s", t, state)
 }

@@ -53,8 +53,9 @@ func NewBufferedInterceptor(
 }
 
 func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
-	// todo verify message index if not the head
-	message.MessageIndex = o.opCounter.Next()
+	if message.MessageIndex == 0 {
+		message.MessageIndex = o.opCounter.Next()
+	}
 	log.Println("Received message: ", message.MessageIndex)
 	if err := o.messages.Add(message); err != nil {
 		panic("illegal state")

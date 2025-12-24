@@ -78,7 +78,6 @@ func (s *serverHandshake) sendMissingData() error {
 
 func (s *serverHandshake) helloMsg() *datalink.ServerHandshakeMsg {
 	lastMsg := s.data.LastMessageIndex()
-
 	return &datalink.ServerHandshakeMsg{
 		Payload: &datalink.ServerHandshakeMsg_Hello{
 			Hello: &datalink.ServerHelo{

@@ -9,33 +9,23 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Command interface{}
-
-type SwitchSuccessorCommand struct {
-	NewAddress string
+type CommandHandler interface {
+	SetNextNode(address string) error
+	SetRole(role controllink.NodeRole) error
 }
 
 type Server struct {
 	rpcServer *rpc.Server
-	commands  chan Command
 }
 
-func (s *Server) Commands() <-chan Command {
-	return s.commands
-}
-
-func NewServer(ctx context.Context, addr string) *Server {
-	commands := make(chan Command, 100)
-	l := &listener{commands: commands}
-	return &Server{
-		rpcServer: rpc.NewServer(ctx, l, addr),
-		commands:  commands,
-	}
+func NewServer(ctx context.Context, addr string, h CommandHandler) *Server {
+	l := &listener{handler: h}
+	return &Server{rpcServer: rpc.NewServer(ctx, l, addr)}
 }
 
 type listener struct {
 	controllink.UnimplementedControlServiceServer
-	commands chan<- Command
+	handler CommandHandler
 }
 
 func (l *listener) Register(grpcServer *grpc.Server) {
@@ -43,13 +33,15 @@ func (l *listener) Register(grpcServer *grpc.Server) {
 }
 
 func (l *listener) SwitchSuccessor(
-	ctx context.Context,
+	_ context.Context,
 	req *controllink.SwitchSuccessorCommand,
 ) (*emptypb.Empty, error) {
-	select {
-	case l.commands <- SwitchSuccessorCommand{NewAddress: req.GetAddress()}:
-		return &emptypb.Empty{}, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return &emptypb.Empty{}, l.handler.SetNextNode(req.GetAddress())
+}
+
+func (l *listener) SwitchRole(
+	_ context.Context,
+	req *controllink.SwitchRoleCommand,
+) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, l.handler.SetRole(req.GetRole())
 }

@@ -14,7 +14,7 @@ import (
 
 type Client struct {
 	ctx      context.Context
-	state    *nodeDFA
+	state    *NodeDFA
 	addr     chan string
 	requests chan *datalink.Message
 	replies  chan *datalink.Confirmation
@@ -24,7 +24,7 @@ type Client struct {
 
 func NewClient(
 	ctx context.Context,
-	state *nodeDFA,
+	state *NodeDFA,
 	data handshake.ClientData,
 	buffer int,
 ) *Client {
@@ -81,8 +81,14 @@ func (c *Client) run() {
 }
 
 func (c *Client) superviseConnection(addr string, ctx context.Context) {
-	c.state.emit(successorConnect)
-	defer c.state.emit(successorDisconnect)
+	if err := c.state.Emit(SuccessorConnect); err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := c.state.Emit(SuccessorDisconnect); err != nil {
+			panic(err)
+		}
+	}()
 
 	for {
 		log.Println("datalink connecting to ", addr)
@@ -113,6 +119,7 @@ func (c *Client) superviseConnection(addr string, ctx context.Context) {
 			}
 		}
 	}
+
 }
 
 func (c *Client) doHandshake(link datalink.DataLinkClient) error {
