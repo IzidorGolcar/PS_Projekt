@@ -56,9 +56,9 @@ func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
 	if message.MessageIndex == 0 {
 		message.MessageIndex = o.opCounter.Next()
 	}
-	log.Println("Received message: ", message.MessageIndex)
+	log.Println("Received message:", message.MessageIndex)
 	if err := o.messages.Add(message); err != nil {
-		panic("illegal state")
+		log.Println("Failed to buffer message:", err)
 	}
 	return o.baseInterceptor.OnMessage(message)
 }
@@ -97,7 +97,7 @@ func (o *BufferedInterceptor) ProcessMessages(messages []*datalink.Message) {
 	}
 	err := o.messages.Add(messages...)
 	if err != nil {
-		log.Fatalln("Illegal state: ", err)
+		log.Println("Failed to buffer message: ", err)
 	}
 }
 
@@ -107,7 +107,7 @@ func (o *BufferedInterceptor) ProcessConfirmations(confirmations []*datalink.Con
 	}
 	err := o.confirmations.Add(confirmations...)
 	if err != nil {
-		log.Fatalln("Illegal state: ", err)
+		log.Println("Failed to buffer confirmation: ", err)
 	}
 }
 

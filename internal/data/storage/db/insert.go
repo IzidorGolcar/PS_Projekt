@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"seminarska/internal/data/storage/entities"
 )
 
@@ -44,7 +45,7 @@ func (i *UnsafeInsertReceipt[E]) Cancel(err error) {
 		panic(err)
 	}
 	e, err := i.record.Value()
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrUninitialized) {
 		panic(err)
 	}
 	delete(i.r.records, e.Id())

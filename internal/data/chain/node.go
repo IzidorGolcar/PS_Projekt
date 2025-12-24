@@ -58,9 +58,7 @@ func (n *Node) run() {
 		cancel   context.CancelFunc
 	)
 
-	// FIXME when successor disconnect node automatically starts confirming requests.
-	// this is not the desired effect unless the successor was tail.
-	// Node should be explicitly given a tail role.
+	// FIXME when a mid node disconnect a message in its predecessors outbound channel will be sent twice
 
 	for {
 		select {

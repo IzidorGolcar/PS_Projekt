@@ -35,23 +35,21 @@ func (s *SnapshotRecord[E]) IsDirty() bool {
 }
 
 func (s *SnapshotRecord[E]) Value() (e E, err error) {
+	e = s.confirmedValue.e
 	if !s.initialized {
 		err = ErrUninitialized
 	} else if s.confirmedValue.deleted {
 		err = ErrDeleted
-	} else {
-		e = s.confirmedValue.e
 	}
 	return
 }
 
 func (s *SnapshotRecord[E]) DirtyValue() (e E, err error) {
+	e = s.dirtyValue.e
 	if !s.dirty {
 		err = ErrNotDirty
 	} else if s.dirtyValue.deleted {
 		err = ErrDeleted
-	} else {
-		e = s.dirtyValue.e
 	}
 	return
 }

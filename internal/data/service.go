@@ -15,7 +15,6 @@ type Service struct {
 	node           *chain.Node
 	control        *control.Server
 	ctx            context.Context
-	done           chan struct{}
 }
 
 func NewService(ctx context.Context, config config.NodeConfig) *Service {
@@ -33,7 +32,6 @@ func NewService(ctx context.Context, config config.NodeConfig) *Service {
 		requestsServer: requests.NewServer(ctx, database, config.ServiceAddress),
 		control:        control.NewServer(ctx, config.ControlListenerAddress, node),
 		node:           node,
-		done:           make(chan struct{}),
 	}
 	return s
 }
@@ -42,7 +40,6 @@ func (n *Service) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		<-n.done
 		<-n.node.Done()
 		<-n.requestsServer.Done()
 	}()
