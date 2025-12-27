@@ -8,6 +8,9 @@ import (
 	"seminarska/internal/common/rpc"
 	"seminarska/proto/controllink"
 	"syscall"
+	"time"
+
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Client struct {
@@ -73,6 +76,14 @@ func (c *Client) StartNewDataNode(cfg NodeConfig) (*NodeDescriptor, error) {
 	}
 
 	return descriptor, nil
+}
+
+func (c *Client) Ping(node *NodeDescriptor) error {
+	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.config.controlAddress))
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	_, err := control.Ping(ctx, &emptypb.Empty{})
+	return err
 }
 
 func (c *Client) SwitchNodeRole(node *NodeDescriptor, newRole controllink.NodeRole) error {

@@ -45,3 +45,7 @@ func (l *listener) SwitchRole(
 ) (*emptypb.Empty, error) {
 	return &emptypb.Empty{}, l.handler.SetRole(req.GetRole())
 }
+
+func (l *listener) Ping(_ context.Context, _ *emptypb.Empty) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}

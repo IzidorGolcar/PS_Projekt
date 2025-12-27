@@ -23,4 +23,5 @@ message SwitchRoleCommand {
 service ControlService {
   rpc SwitchSuccessor(SwitchSuccessorCommand) returns (google.protobuf.Empty);
   rpc SwitchRole(SwitchRoleCommand) returns (google.protobuf.Empty);
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
