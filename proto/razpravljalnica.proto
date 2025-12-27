@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package razpravljalnica;
 
-option go_package = "seminarska/proto/razpravljalnica";
+option go_package = "seminarska/proto/razpravljalnica;razpravljalnica";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";

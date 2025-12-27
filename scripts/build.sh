@@ -9,7 +9,10 @@ go build -o build/data_service cmd/data/main.go
 echo 'building client'
 go build -o build/client cmd/client/main.go
 
-echo 'building control service'
+echo 'building mock control service'
 go build -o build/contrl_service cmd/control/main.go
+
+echo 'building Raft control plane'
+go build -o build/control_plane cmd/controlplane/main.go
 
 echo 'done'

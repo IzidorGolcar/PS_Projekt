@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package datalink;
 
-option go_package = "seminarska/proto/datalink";
+option go_package = "seminarska/proto/datalink;datalink";
 
 import "razpravljalnica.proto";
 

@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package controllink;
-option go_package = "seminarska/proto/controllink";
+option go_package = "seminarska/proto/controllink;controllink";
 
 import "google/protobuf/empty.proto";
 
