@@ -1,6 +1,0 @@
-###
-GRPC localhost:5981/controllink.ControlService/SwitchSuccessor
-
-{
-  "Address": ":5990"
-}

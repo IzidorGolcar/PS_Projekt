@@ -25,4 +25,3 @@ func randomElectionTimeout() time.Duration {
 	max := int64(MaxElectionTimeout)
 	return time.Duration(min + rand.Int63n(max-min))
 }
-

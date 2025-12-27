@@ -155,4 +155,3 @@ func (n *Node) handleCommand(cmd Command) error {
 func (n *Node) IsLeader() bool {
 	return n.state.GetState() == Leader
 }
-

@@ -165,4 +165,3 @@ func (n *Node) applyEntry(entry LogEntry) {
 
 	log.Printf("[Raft %s] Applied entry %d", n.state.GetNodeID(), entry.Index)
 }
-

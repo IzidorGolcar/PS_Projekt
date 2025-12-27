@@ -142,4 +142,3 @@ func (pc *peerClient) IsHealthy() bool {
 	defer pc.connMu.RUnlock()
 	return pc.healthy
 }
-

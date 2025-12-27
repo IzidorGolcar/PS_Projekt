@@ -160,4 +160,3 @@ func (hc *HealthChecker) checkNode(node *dataNodeClient) {
 		log.Printf("[HealthChecker] Node %s is UP", node.nodeID)
 	}
 }
-

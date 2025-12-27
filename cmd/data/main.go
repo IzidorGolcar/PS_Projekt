@@ -13,7 +13,7 @@ import (
 
 func main() {
 	cfg := config.Load()
-	configureLogger(cfg.NodeId)
+	configureLogger(cfg)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	log.Println("Starting data service")
@@ -28,9 +28,18 @@ func main() {
 	}
 }
 
-func configureLogger(serviceId string) {
-	log.Default().SetOutput(os.Stdout)
+func configureLogger(cfg config.NodeConfig) {
+	if cfg.LogPath == "" {
+		log.Default().SetOutput(os.Stdout)
+	} else {
+		file, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Default().SetOutput(file)
+	}
+
 	log.Default().SetFlags(log.LstdFlags | log.Lmsgprefix)
-	prefix := fmt.Sprintf("[%s] ", serviceId)
+	prefix := fmt.Sprintf("[%s] ", cfg.NodeId)
 	log.Default().SetPrefix(prefix)
 }

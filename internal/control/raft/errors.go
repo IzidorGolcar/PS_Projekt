@@ -12,4 +12,3 @@ var (
 	// ErrAlreadyExists is returned when trying to add a node that already exists
 	ErrAlreadyExists = errors.New("node already exists")
 )
-
