@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"errors"
 	"log"
 	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/datalink"
@@ -58,6 +59,10 @@ func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
 	}
 	log.Println("Received message:", message.MessageIndex)
 	if err := o.messages.Add(message); err != nil {
+		if errors.Is(err, ErrIndexOutOfOrder) {
+			log.Println("Ignoring duplicate message:", message.MessageIndex)
+			return nil
+		}
 		log.Println("Failed to buffer message:", err)
 	}
 	return o.baseInterceptor.OnMessage(message)
@@ -66,7 +71,12 @@ func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
 func (o *BufferedInterceptor) OnConfirmation(confirmation *datalink.Confirmation) {
 	log.Println("Received confirmation: ", confirmation.GetMessageIndex())
 	if err := o.confirmations.Add(confirmation); err != nil {
-		panic(err)
+		if errors.Is(err, ErrIndexOutOfOrder) {
+			log.Println("Ignoring duplicate confirmation:", confirmation.GetMessageIndex())
+			return
+		}
+		log.Println("Failed to buffer confirmation:", err)
+		return
 	}
 	o.messages.ClearBefore(confirmation.GetMessageIndex()) // no need to keep old confirmed messages - every node has them
 	o.baseInterceptor.OnConfirmation(confirmation)
@@ -75,7 +85,8 @@ func (o *BufferedInterceptor) OnConfirmation(confirmation *datalink.Confirmation
 func (o *BufferedInterceptor) GetMessagesAfter(i int32) []*datalink.Message {
 	messages, err := o.messages.MessagesAfter(i)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("Error getting messages after", i, ":", err)
+		return nil
 	}
 	return messages
 }
@@ -83,7 +94,8 @@ func (o *BufferedInterceptor) GetMessagesAfter(i int32) []*datalink.Message {
 func (o *BufferedInterceptor) GetConfirmationsAfter(i int32) []*datalink.Confirmation {
 	confirmations, err := o.confirmations.MessagesAfter(i)
 	if err != nil {
-		log.Fatalln(err)
+		log.Println("Error getting confirmations after", i, ":", err)
+		return nil
 	}
 	return confirmations
 }

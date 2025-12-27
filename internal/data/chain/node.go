@@ -6,6 +6,7 @@ import (
 	"seminarska/internal/data/chain/handshake"
 	"seminarska/proto/controllink"
 	"seminarska/proto/datalink"
+	"sync"
 )
 
 // MessageProducer produces messages at the head of the chain
@@ -56,6 +57,7 @@ func (n *Node) run() {
 	var (
 		stateCtx context.Context
 		cancel   context.CancelFunc
+		wg       sync.WaitGroup
 	)
 
 	// FIXME when a mid node disconnect a message in its predecessors outbound channel will be sent twice
@@ -66,22 +68,37 @@ func (n *Node) run() {
 			log.Println("Switching to state:", state)
 			if cancel != nil {
 				cancel()
+				wg.Wait()
 			}
 			stateCtx, cancel = context.WithCancel(n.ctx)
+			wg.Add(1)
 			switch state.Role {
 			case Reader:
-				go n.runAsHead(stateCtx)
+				go func() {
+					defer wg.Done()
+					n.runAsHead(stateCtx)
+				}()
 			case Relay:
-				go n.runAsMid(stateCtx)
+				go func() {
+					defer wg.Done()
+					n.runAsMid(stateCtx)
+				}()
 			case Confirmer:
-				go n.runAsTail(stateCtx)
+				go func() {
+					defer wg.Done()
+					n.runAsTail(stateCtx)
+				}()
 			case ReaderConfirmer:
-				go n.runAsSingleNode(stateCtx)
+				go func() {
+					defer wg.Done()
+					n.runAsSingleNode(stateCtx)
+				}()
 			}
 		case <-n.ctx.Done():
 			log.Println("Shutting down node")
 			if cancel != nil {
 				cancel()
+				wg.Wait()
 			}
 			return
 		}

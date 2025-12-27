@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"log"
 	"seminarska/internal/data/storage/entities"
 )
 
@@ -45,7 +46,11 @@ func (i *UnsafeInsertReceipt[E]) Cancel(err error) {
 		panic(err)
 	}
 	e, err := i.record.Value()
-	if err != nil && !errors.Is(err, ErrUninitialized) {
+	if err != nil {
+		if errors.Is(err, ErrUninitialized) {
+			log.Println("failed to rollback insert: entity uninitialized")
+			return
+		}
 		panic(err)
 	}
 	delete(i.r.records, e.Id())

@@ -28,6 +28,7 @@ func newResponse(requestId string, entityId int64, err error) response {
 
 type Handler struct {
 	relations             Relations
+	mx                    sync.Mutex
 	pendingRequests       map[int32]db.Receipt
 	newMessages           chan *datalink.Message
 	confirmationBroadcast *broadcast.Broadcaster[response]
@@ -37,6 +38,7 @@ type Handler struct {
 func NewHandler(relations Relations) *Handler {
 	return &Handler{
 		relations:             relations,
+		mx:                    sync.Mutex{},
 		confirmationBroadcast: broadcast.New[response](),
 		messageBroadcast:      broadcast.New[*datalink.Message](),
 		pendingRequests:       make(map[int32]db.Receipt),

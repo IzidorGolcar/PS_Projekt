@@ -18,6 +18,8 @@ func (h *Handler) OnMessage(message *datalink.Message) error {
 	if err != nil {
 		return err
 	}
+	h.mx.Lock()
+	defer h.mx.Unlock()
 	h.pendingRequests[message.GetMessageIndex()] = receipt
 	return nil
 }

@@ -73,9 +73,8 @@ func (b *ReplayBuffer[T]) ClearBefore(index int32) {
 	b.mx.Lock()
 	defer b.mx.Unlock()
 	for i, msg := range b.buffer {
-		if msg.GetMessageIndex() == index {
+		if msg.GetMessageIndex() >= index {
 			b.buffer = b.buffer[i:]
-		} else if msg.GetMessageIndex() > index {
 			return
 		}
 	}

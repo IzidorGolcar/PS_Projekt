@@ -16,10 +16,14 @@ func (h *Handler) OnConfirmation(confirmation *datalink.Confirmation) {
 		int64(confirmation.GetMessageIndex()),
 		err,
 	))
+	h.mx.Lock()
 	receipt, ok := h.pendingRequests[confirmation.GetMessageIndex()]
 	if !ok {
+		h.mx.Unlock()
 		return
 	}
+	delete(h.pendingRequests, confirmation.GetMessageIndex())
+	h.mx.Unlock()
 	if confirmation.Ok {
 		err := receipt.Confirm()
 		if err != nil {

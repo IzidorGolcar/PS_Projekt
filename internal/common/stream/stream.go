@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"errors"
+	"sync"
 )
 
 type BidiStream[Req any, Res any] interface {
@@ -13,6 +14,7 @@ type BidiStream[Req any, Res any] interface {
 type Supervisor[O any, I any] struct {
 	outbound       chan O
 	inbound        chan I
+	mx             sync.Mutex
 	droppedMessage *O
 }
 
@@ -20,10 +22,12 @@ func NewSupervisor[O any, I any](
 	outbound chan O,
 	inbound chan I,
 ) *Supervisor[O, I] {
-	return &Supervisor[O, I]{outbound, inbound, nil}
+	return &Supervisor[O, I]{outbound, inbound, sync.Mutex{}, nil}
 }
 
 func (c *Supervisor[O, I]) DroppedMessage() *O {
+	c.mx.Lock()
+	defer c.mx.Unlock()
 	return c.droppedMessage
 }
 
@@ -46,7 +50,9 @@ func (c *Supervisor[O, I]) transmit(
 			return
 		case msg := <-c.outbound:
 			if err := stream.Send(msg); err != nil {
+				c.mx.Lock()
 				c.droppedMessage = &msg
+				c.mx.Unlock()
 				cancel(errors.Join(errors.New("failed to send message"), err))
 				return
 			}

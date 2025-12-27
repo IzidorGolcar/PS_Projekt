@@ -64,7 +64,8 @@ type NodeDFA struct {
 
 func NewNodeDFA() *NodeDFA {
 	s := &NodeDFA{
-		states:    make(chan NodeState, 1),
+		mx:        &sync.Mutex{},
+		states:    make(chan NodeState, 100),
 		lastState: NewNodeState(Single, ReaderConfirmer),
 	}
 	return s
@@ -75,6 +76,8 @@ func (d *NodeDFA) States() <-chan NodeState {
 }
 
 func (d *NodeDFA) Emit(e event) error {
+	d.mx.Lock()
+	defer d.mx.Unlock()
 	switch e {
 	case PredecessorConnect:
 		if d.lastState.Role == ReaderConfirmer ||
@@ -90,8 +93,7 @@ func (d *NodeDFA) Emit(e event) error {
 			return illegalTransitionError(d.lastState, e)
 		}
 	case SuccessorConnect:
-		if d.lastState.Role == ReaderConfirmer ||
-			d.lastState.Role == Confirmer {
+		if d.lastState.Role == Confirmer {
 			return illegalTransitionError(d.lastState, e)
 		}
 		switch d.lastState.Position {
