@@ -5,7 +5,6 @@ import (
 	"seminarska/internal/data/storage/entities"
 	"seminarska/proto/razpravljalnica"
 
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -141,18 +140,22 @@ func (l *listener) GetSubcscriptionNode(
 	panic("implement me")
 }
 
+// SubscribeTopic streams message events for a given topic to the client.
+// Note: The stream parameter uses the generated MessageBoard_SubscribeTopicServer interface
+// instead of the generic grpc.ServerStreamingServer[T] to match the interface expected by
+// the protoc-gen-go-grpc generated code.
 func (l *listener) SubscribeTopic(
 	request *razpravljalnica.SubscribeTopicRequest,
-	g grpc.ServerStreamingServer[razpravljalnica.MessageEvent],
+	stream razpravljalnica.MessageBoard_SubscribeTopicServer,
 ) error {
-	for msg := range l.db.SubscribeTopic(g.Context(), request.GetTopicId()) {
+	for msg := range l.db.SubscribeTopic(stream.Context(), request.GetTopicId()) {
 		rMessage := &razpravljalnica.MessageEvent{Message: entities.EntityToDatalink(msg).GetMessage()}
 		likes, err := l.db.GetLikes(msg.Id())
 		if err != nil {
 			return err
 		}
 		rMessage.Message.Likes = int32(likes)
-		err = g.Send(rMessage)
+		err = stream.Send(rMessage)
 		if err != nil {
 			return err
 		}
