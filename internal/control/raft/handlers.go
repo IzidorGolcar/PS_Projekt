@@ -65,7 +65,7 @@ func (n *Node) handleAppendEntries(req AppendEntriesRequest) AppendEntriesRespon
 		currentTerm = req.Term
 	}
 
-	// Reset election timeout - we've heard from the leader
+	// reset election timeout - we've heard from the leader
 	n.state.ResetElectionTimeout()
 	n.state.SetLeaderID(req.LeaderID)
 
