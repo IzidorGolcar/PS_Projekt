@@ -1,6 +1,11 @@
 package messages
 
-import tea "github.com/charmbracelet/bubbletea"
+import (
+	"seminarska/internal/client/components/forum/overview"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 type SizeMsg struct {
 	H, W int
@@ -13,18 +18,17 @@ func SizeCmd(h, w int) tea.Cmd {
 }
 
 type LoadMsg struct {
-	refresh  bool
+	Topic    overview.Topic
 	Messages []Message
 }
 
-func RefreshCmd(messages []Message) tea.Cmd {
-	return func() tea.Msg {
-		return LoadMsg{Messages: messages, refresh: true}
-	}
+type LoadRequest struct {
+	Topic overview.Topic
 }
 
-func LoadCmd(messages []Message) tea.Cmd {
+func LoadRequestCmd(topic overview.Topic, delay time.Duration) tea.Cmd {
 	return func() tea.Msg {
-		return LoadMsg{Messages: messages}
+		time.Sleep(delay)
+		return LoadRequest{Topic: topic}
 	}
 }

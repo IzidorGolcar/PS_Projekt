@@ -111,7 +111,7 @@ func (l *listener) GetMessages(
 	_ context.Context,
 	request *razpravljalnica.GetMessagesRequest,
 ) (*razpravljalnica.GetMessagesResponse, error) {
-	messages, err := l.db.GetMessages(request.GetFromMessageId(), request.GetLimit())
+	messages, err := l.db.GetMessages(request.GetFromMessageId(), request.GetTopicId(), request.GetLimit())
 	if err != nil {
 		return nil, err
 	}
@@ -131,14 +131,6 @@ func (l *listener) GetMessages(
 	return &razpravljalnica.GetMessagesResponse{
 		Messages: out,
 	}, nil
-}
-
-func (l *listener) GetSubcscriptionNode(
-	_ context.Context,
-	request *razpravljalnica.SubscriptionNodeRequest,
-) (*razpravljalnica.SubscriptionNodeResponse, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (l *listener) SubscribeTopic(

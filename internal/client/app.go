@@ -7,6 +7,9 @@ import (
 	"seminarska/internal/client/components"
 	"seminarska/internal/client/components/appbar"
 	"seminarska/internal/client/components/forum"
+	"seminarska/internal/client/components/forum/chat/input"
+	"seminarska/internal/client/components/forum/chat/messages"
+	"seminarska/internal/client/components/forum/overview"
 	"seminarska/internal/client/components/login"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,43 +42,53 @@ func NewAppModel(controlAddr string) AppModel {
 	}
 }
 
-func (a AppModel) Init() tea.Cmd {
-	return components.InitChildren(a.children)
+func (m AppModel) Init() tea.Cmd {
+	return components.InitChildren(m.children)
 }
 
-func (a AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	cmds := components.UpdateChildren(a.children, msg)
+func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmds := components.UpdateChildren(m.children, msg)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
-			return a, tea.Quit
+			return m, tea.Quit
 		}
 
 	case login.RequestMsg:
-		return a, LoginCommand(msg.Username, msg.NewUser)
+		return m, tea.Batch(cmds, m.LoginCommand(msg.Username, msg.NewUser))
 
 	case LoginResultMsg:
 		if msg.success {
-			a.r = ChatRoute
+			m.r = ChatRoute
 		} else {
 			errMsg := fmt.Sprintf("Login failed: %s", msg.explanation)
-			return a, login.ResetCmd(errMsg)
+			return m, tea.Batch(cmds, login.ResetCmd(errMsg))
 		}
+
+	case overview.LoadRequestMsg:
+		return m, tea.Batch(cmds, m.LoadResponseCmd())
+
+	case messages.LoadRequest:
+		return m, tea.Batch(cmds, m.LoadMsgCmd(msg.Topic))
+
+	case input.NewMessageMsg:
+		return m, tea.Batch(cmds, m.SendMessageCmd(msg.Topic, msg.Text))
 	}
-	return a, cmds
+
+	return m, cmds
 }
 
-func (a AppModel) View() string {
+func (m AppModel) View() string {
 	var content string
 
-	switch a.r {
+	switch m.r {
 	case LoginRoute:
-		content = a.children[1].View()
+		content = m.children[1].View()
 	case ChatRoute:
-		content = a.children[2].View()
+		content = m.children[2].View()
 	}
 
-	return a.children[0].View() + "\n" + content
+	return m.children[0].View() + "\n" + content
 }

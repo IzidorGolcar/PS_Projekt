@@ -3,17 +3,33 @@ package overview
 import (
 	"math"
 	"seminarska/internal/client/components/appbar"
+	"strconv"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+type Topic struct {
+	Name string
+	Id   int
+}
+
+func (t Topic) FilterValue() string {
+	return t.Name
+}
+
+func (t Topic) Title() string {
+	return t.Name
+}
+
+func (t Topic) Description() string { return strconv.Itoa(t.Id) }
+
 type Model struct {
-	focused int
-	loaded  bool
-	list    list.Model
-	w, h    int
+	loaded bool
+	list   list.Model
+	w, h   int
 }
 
 func NewModel() Model {
@@ -23,6 +39,10 @@ func NewModel() Model {
 	l.SetShowTitle(false)
 	l.SetShowStatusBar(false)
 	l.SetShowFilter(false)
+	l.KeyMap = list.KeyMap{
+		CursorUp:   key.NewBinding(key.WithKeys("up")),
+		CursorDown: key.NewBinding(key.WithKeys("down")),
+	}
 	l.Title = "Topics"
 
 	return Model{
@@ -32,29 +52,37 @@ func NewModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return RefreshCmd()
+	return LoadRequestCmd(100)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case RefreshMsg:
+	case LoadResponseMsg:
+		if len(msg.Topics) == 0 {
+			return m, nil
+		}
 		m.loaded = true
-		cmd := m.list.SetItems(msg.topics)
-		return m, cmd
+		cmd := m.list.SetItems(msg.listItems())
+		return m, tea.Batch(cmd, SelectTopicCmd(msg.Topics[0]))
 	case tea.WindowSizeMsg:
 		m.w = int(math.Floor(float64(msg.Width) * 0.3))
 		m.h = msg.Height - appbar.Height
 		x, y := contentStyle.GetFrameSize()
 		m.list.SetSize(m.w-x, m.h-y)
 	case tea.KeyMsg:
-		if msg.String() == "enter" {
-			selected := m.list.SelectedItem().(*topic)
-			return m, OpenChatCmd(selected.Title())
+		if msg.String() == "up" || msg.String() == "down" {
+			var listCmd tea.Cmd
+			m.list, listCmd = m.list.Update(msg)
+
+			if m.list.Items() == nil || len(m.list.Items()) == 0 {
+				return m, listCmd
+			}
+			selectedTopic := m.list.SelectedItem().(Topic)
+			return m, tea.Batch(listCmd, SelectTopicCmd(selectedTopic))
 		}
 	}
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+
+	return m, nil
 }
 
 var docStyle = lipgloss.NewStyle().Background(lipgloss.Color("234"))

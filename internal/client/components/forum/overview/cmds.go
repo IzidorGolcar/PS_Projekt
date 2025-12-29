@@ -1,51 +1,40 @@
 package overview
 
 import (
-	"strconv"
-
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type topic struct {
-	name string
-	id   int
+type LoadRequestMsg struct {
+	Limit int
 }
 
-func (t topic) FilterValue() string {
-	return t.name
-}
-
-func (t topic) Title() string {
-	return t.name
-}
-
-func (t topic) Description() string { return strconv.Itoa(t.id) }
-
-type RefreshMsg struct {
-	topics []list.Item
-}
-
-func RefreshCmd() tea.Cmd {
+func LoadRequestCmd(limit int) tea.Cmd {
 	return func() tea.Msg {
-		return RefreshMsg{
-			topics: []list.Item{
-				&topic{"topic 1", 1},
-				&topic{"topic 2", 2},
-				&topic{"topic 3", 3},
-				&topic{"topic 4", 4},
-				&topic{"topic 5", 5},
-			},
-		}
+		return LoadRequestMsg{limit}
 	}
 }
 
-type OpenChatMsg struct {
-	TopicId string
+type LoadResponseMsg struct {
+	Success bool
+	Err     error
+	Topics  []Topic
 }
 
-func OpenChatCmd(topicId string) tea.Cmd {
+func (m *LoadResponseMsg) listItems() []list.Item {
+	items := make([]list.Item, len(m.Topics))
+	for i, topic := range m.Topics {
+		items[i] = topic
+	}
+	return items
+}
+
+type SelectTopicMsg struct {
+	Topic Topic
+}
+
+func SelectTopicCmd(topic Topic) tea.Cmd {
 	return func() tea.Msg {
-		return OpenChatMsg{TopicId: topicId}
+		return SelectTopicMsg{topic}
 	}
 }

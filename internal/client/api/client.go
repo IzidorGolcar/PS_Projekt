@@ -24,7 +24,7 @@ func NewClient(ctx context.Context, controlAddress string) *Client {
 }
 
 func (c *Client) headAddr() (string, error) {
-	return ":6991", nil
+	return ":5972", nil
 	state, err := c.control.GetClusterState(c.ctx, &emptypb.Empty{})
 	if err != nil {
 		return "", err
@@ -33,7 +33,7 @@ func (c *Client) headAddr() (string, error) {
 }
 
 func (c *Client) tailAddr() (string, error) {
-	return ":6991", nil
+	return ":5972", nil
 	state, err := c.control.GetClusterState(c.ctx, &emptypb.Empty{})
 	if err != nil {
 		return "", err
@@ -42,7 +42,7 @@ func (c *Client) tailAddr() (string, error) {
 }
 
 func (c *Client) subAddr() (string, string, error) {
-	return ":6991", "", nil
+	return ":5972", "", nil
 	request := &razpravljalnica.SubscriptionNodeRequest{
 		UserId:  int64(c.userId),
 		TopicId: nil,
@@ -59,12 +59,14 @@ func (c *Client) getClient(addr string) razpravljalnica.MessageBoardClient {
 	return razpravljalnica.NewMessageBoardClient(rpcClient)
 }
 
-func (c *Client) SignUp() error {
+func (c *Client) SignUp(username string) error {
 	addr, err := c.headAddr()
 	if err != nil {
 		return err
 	}
-	req := &razpravljalnica.CreateUserRequest{}
+	req := &razpravljalnica.CreateUserRequest{
+		Name: username,
+	}
 	res, err := c.getClient(addr).CreateUser(c.ctx, req)
 	if err != nil {
 		return err
@@ -103,7 +105,7 @@ func (c *Client) GetMessages(topicId int) ([]*razpravljalnica.Message, error) {
 	req := &razpravljalnica.GetMessagesRequest{
 		TopicId:       int64(topicId),
 		FromMessageId: 0,
-		Limit:         100,
+		Limit:         0,
 	}
 	messages, err := c.getClient(addr).GetMessages(c.ctx, req)
 	if err != nil {
@@ -112,12 +114,16 @@ func (c *Client) GetMessages(topicId int) ([]*razpravljalnica.Message, error) {
 	return messages.GetMessages(), nil
 }
 
-func (c *Client) PostMessage() error {
+func (c *Client) PostMessage(topicId int, text string) error {
 	addr, err := c.headAddr()
 	if err != nil {
 		return err
 	}
-	req := &razpravljalnica.PostMessageRequest{}
+	req := &razpravljalnica.PostMessageRequest{
+		TopicId: int64(topicId),
+		UserId:  int64(c.userId),
+		Text:    text,
+	}
 	_, err = c.getClient(addr).PostMessage(c.ctx, req)
 	return err
 }

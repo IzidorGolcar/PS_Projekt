@@ -1,7 +1,7 @@
 package input
 
 import (
-	"seminarska/internal/client/components/forum/chat/messages"
+	"seminarska/internal/client/components/forum/overview"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -13,6 +13,7 @@ const Height = 4
 type Model struct {
 	W     int
 	input textinput.Model
+	topic overview.Topic
 }
 
 func NewModel() Model {
@@ -42,12 +43,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			value := m.input.Value()
 			if value != "" {
 				m.input.Reset()
-				return m, messages.LoadCmd([]messages.Message{{
-					Text: value,
-					User: "",
-				}})
+				return m, NewMessageCmd(value, m.topic)
 			}
 		}
+	case overview.SelectTopicMsg:
+		m.input.Reset()
+		m.topic = msg.Topic
 	}
 
 	return m, cmd

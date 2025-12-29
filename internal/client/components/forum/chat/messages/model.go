@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"seminarska/internal/client/components/forum/overview"
 	"time"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -19,6 +20,7 @@ type Model struct {
 	messages []Message
 	ready    bool
 	viewport viewport.Model
+	topic    overview.Topic
 }
 
 func NewModel() Model {
@@ -26,13 +28,7 @@ func NewModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return LoadCmd([]Message{
-		{
-			Text: "Hello picka!",
-			User: "kurac",
-			Time: time.Now(),
-		},
-	})
+	return nil
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -51,21 +47,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.GotoBottom()
 		}
 	case LoadMsg:
-		if msg.refresh {
-			m.messages = msg.Messages
-		} else {
-			m.messages = append(m.messages, msg.Messages...)
+		if equalSlices(msg.Messages, m.messages) || m.topic != msg.Topic {
+			return m, LoadRequestCmd(m.topic, 200*time.Millisecond)
 		}
+		m.messages = msg.Messages
 		if m.ready {
 			m.viewport.SetContent(renderMessages(m.messages))
 			m.viewport.GotoBottom()
 		}
+		return m, LoadRequestCmd(msg.Topic, 200*time.Millisecond)
+	case overview.SelectTopicMsg:
+		m.messages = nil
+		m.viewport.SetContent("")
+		m.topic = msg.Topic
+		return m, LoadRequestCmd(msg.Topic, 0)
 	}
 
 	var vpCmd tea.Cmd
 	m.viewport, vpCmd = m.viewport.Update(msg)
 
 	return m, vpCmd
+}
+
+func equalSlices[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 var (
