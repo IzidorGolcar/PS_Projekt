@@ -35,13 +35,15 @@ func (m Model) Init() tea.Cmd {
 }
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	m.input, cmd = m.input.Update(msg)
+	if m.topic.Id != 0 {
+		m.input, cmd = m.input.Update(msg)
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.String() == "enter" {
 			value := m.input.Value()
-			if value != "" {
+			if value != "" && m.topic.Id != 0 {
 				m.input.Reset()
 				return m, NewMessageCmd(value, m.topic)
 			}

@@ -2,10 +2,14 @@ package requests
 
 import (
 	"context"
+	"errors"
 	"seminarska/internal/data/storage/entities"
+	"seminarska/proto/datalink"
 	"seminarska/proto/razpravljalnica"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -16,6 +20,33 @@ func (l *listener) CreateUser(
 	user, err := l.db.CreateUser(ctx, request.GetName())
 	if err != nil {
 		return nil, err
+	}
+	return entities.EntityToDatalink(user).GetUser(), nil
+}
+
+func (l *listener) GetUser(_ context.Context, req *razpravljalnica.GetUserRequest) (*razpravljalnica.User, error) {
+	if req.UserId == nil && req.Username == nil {
+		return nil, errors.New("bad request")
+	}
+	var user *entities.User
+	var err error
+	if req.UserId != nil {
+		user, err = l.db.Users().Get(req.GetUserId())
+	} else {
+		var users []*entities.User
+		users, err = l.db.Users().GetPredicate(func(user *entities.User) bool {
+			return user.Name == req.GetUsername()
+		}, 1)
+		if err == nil {
+			if len(users) == 1 {
+				user = users[0]
+			} else {
+				err = errors.New("not found")
+			}
+		}
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "user not found")
 	}
 	return entities.EntityToDatalink(user).GetUser(), nil
 }
@@ -137,9 +168,25 @@ func (l *listener) SubscribeTopic(
 	request *razpravljalnica.SubscribeTopicRequest,
 	g grpc.ServerStreamingServer[razpravljalnica.MessageEvent],
 ) error {
-	for msg := range l.db.SubscribeTopic(g.Context(), request.GetTopicId()) {
-		rMessage := &razpravljalnica.MessageEvent{Message: entities.EntityToDatalink(msg).GetMessage()}
-		likes, err := l.db.GetLikes(msg.Id())
+	if request.GetSubscribeToken() != l.subToken {
+		return status.Error(codes.Unauthenticated, "invalid token")
+	}
+	for e := range l.db.SubscribeTopic(g.Context(), request.GetTopicId()) {
+		var op razpravljalnica.OpType
+		switch e.Operation {
+		case datalink.Operation_Delete:
+			op = razpravljalnica.OpType_OP_DELETE
+		case datalink.Operation_Update:
+			op = razpravljalnica.OpType_OP_UPDATE
+		case datalink.Operation_Create:
+			op = razpravljalnica.OpType_OP_POST
+		}
+
+		rMessage := &razpravljalnica.MessageEvent{
+			Message: entities.EntityToDatalink(e.Message).GetMessage(),
+			Op:      op,
+		}
+		likes, err := l.db.GetLikes(e.Message.Id())
 		if err != nil {
 			return err
 		}

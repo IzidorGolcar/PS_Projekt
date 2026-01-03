@@ -58,6 +58,8 @@ service  MessageBoard{
   // Creates a new user and assigns it an id
   rpc CreateUser(CreateUserRequest) returns (User);
 
+  rpc GetUser(GetUserRequest) returns (User);
+
   // Creates a new topic to which users can post messages
   rpc CreateTopic(CreateTopicRequest) returns (Topic);
 
@@ -88,6 +90,12 @@ service  MessageBoard{
 
 message CreateUserRequest {
   string name = 1;
+}
+
+message GetUserRequest {
+  // at least one must be set
+  optional int64 user_id = 1;
+  optional string username = 2;
 }
 
 message CreateTopicRequest {

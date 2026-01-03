@@ -14,6 +14,10 @@ type Client struct {
 	userId  int
 }
 
+func (c *Client) UserId() int {
+	return c.userId
+}
+
 func NewClient(ctx context.Context, controlAddress string) *Client {
 	controlRpc := rpc.NewClient(ctx, controlAddress)
 	control := razpravljalnica.NewControlPlaneClient(controlRpc)
@@ -24,7 +28,6 @@ func NewClient(ctx context.Context, controlAddress string) *Client {
 }
 
 func (c *Client) headAddr() (string, error) {
-	return ":5972", nil
 	state, err := c.control.GetClusterState(c.ctx, &emptypb.Empty{})
 	if err != nil {
 		return "", err
@@ -33,7 +36,6 @@ func (c *Client) headAddr() (string, error) {
 }
 
 func (c *Client) tailAddr() (string, error) {
-	return ":5972", nil
 	state, err := c.control.GetClusterState(c.ctx, &emptypb.Empty{})
 	if err != nil {
 		return "", err
@@ -42,7 +44,6 @@ func (c *Client) tailAddr() (string, error) {
 }
 
 func (c *Client) subAddr() (string, string, error) {
-	return ":5972", "", nil
 	request := &razpravljalnica.SubscriptionNodeRequest{
 		UserId:  int64(c.userId),
 		TopicId: nil,
@@ -75,13 +76,20 @@ func (c *Client) SignUp(username string) error {
 	return nil
 }
 
-func (c *Client) Login() error {
-	//addr, err := c.headAddr()
-	//if err != nil {
-	//	return err
-	//}
-
-	panic("implement me")
+func (c *Client) Login(username string) error {
+	addr, err := c.tailAddr()
+	if err != nil {
+		return err
+	}
+	name := username
+	req := &razpravljalnica.GetUserRequest{
+		Username: &name,
+	}
+	user, err := c.getClient(addr).GetUser(c.ctx, req)
+	if err != nil {
+		return err
+	}
+	c.userId = int(user.GetId())
 	return nil
 }
 
@@ -95,6 +103,34 @@ func (c *Client) ListTopics() ([]*razpravljalnica.Topic, error) {
 		return nil, err
 	}
 	return topics.GetTopics(), nil
+}
+
+func (c *Client) CreateTopic(name string) error {
+	addr, err := c.headAddr()
+	if err != nil {
+		return err
+	}
+	req := &razpravljalnica.CreateTopicRequest{
+		Name: name,
+	}
+	_, err = c.getClient(addr).CreateTopic(c.ctx, req)
+	return err
+}
+
+func (c *Client) GetUsername(userId int) (string, error) {
+	addr, err := c.tailAddr()
+	if err != nil {
+		return "", err
+	}
+	id := int64(userId)
+	req := &razpravljalnica.GetUserRequest{
+		UserId: &id,
+	}
+	user, err := c.getClient(addr).GetUser(c.ctx, req)
+	if err != nil {
+		return "", err
+	}
+	return user.GetName(), nil
 }
 
 func (c *Client) GetMessages(topicId int) ([]*razpravljalnica.Message, error) {

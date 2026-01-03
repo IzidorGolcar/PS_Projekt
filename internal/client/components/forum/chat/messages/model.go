@@ -10,9 +10,10 @@ import (
 )
 
 type Message struct {
-	Text string
-	User string
-	Time time.Time
+	MyMessage bool
+	Text      string
+	User      string
+	Time      time.Time
 }
 
 type Model struct {
@@ -39,12 +40,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.ready {
 			m.viewport = viewport.New(m.w-fx, m.h-fy)
 			m.viewport.KeyMap = viewport.KeyMap{}
-			m.viewport.SetContent(renderMessages(m.messages))
+			m.viewport.SetContent(renderMessages(m.messages, m.w))
 			m.ready = true
 		} else {
 			m.viewport.Width = m.w - fx
 			m.viewport.Height = m.h - fy
-			m.viewport.GotoBottom()
+			m.viewport.ScrollDown(m.viewport.TotalLineCount())
 		}
 	case LoadMsg:
 		if equalSlices(msg.Messages, m.messages) || m.topic != msg.Topic {
@@ -52,8 +53,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.messages = msg.Messages
 		if m.ready {
-			m.viewport.SetContent(renderMessages(m.messages))
-			m.viewport.GotoBottom()
+			m.viewport.SetContent(renderMessages(m.messages, m.w))
+			m.viewport.ScrollDown(m.viewport.TotalLineCount())
 		}
 		return m, LoadRequestCmd(msg.Topic, 200*time.Millisecond)
 	case overview.SelectTopicMsg:
@@ -82,18 +83,38 @@ func equalSlices[T comparable](a, b []T) bool {
 }
 
 var (
-	messageStyle      = lipgloss.NewStyle().Padding(0, 4)
-	otherMessageStyle = messageStyle.Border(lipgloss.RoundedBorder()) //.BorderForeground(lipgloss.Color("237")).Background(lipgloss.Color("233")).BorderBackground(lipgloss.Color("233"))
-	myMessageStyle    = messageStyle.Border(lipgloss.RoundedBorder()) //.BorderForeground(lipgloss.Color("#f7adad"))
+	background = lipgloss.Color("233")
 )
 
-func renderMessages(messages []Message) string {
+var (
+	messageStyle = lipgloss.NewStyle().
+			Padding(0, 2).
+			Background(background).
+			BorderBackground(background).
+			Border(lipgloss.RoundedBorder())
+	otherMessageStyle = messageStyle.BorderForeground(lipgloss.Color("237"))
+	myMessageStyle    = messageStyle.BorderForeground(lipgloss.Color("#f7adad"))
+	senderStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+)
+
+func renderMessages(messages []Message, w int) string {
 	var msgContents []string
 	for _, msg := range messages {
-		content := otherMessageStyle.Render(msg.Text)
-		msgContents = append(msgContents, content)
+		var style lipgloss.Style
+		if msg.MyMessage {
+			style = myMessageStyle
+		} else {
+			style = otherMessageStyle
+		}
+		content := style.Render(renderContent(msg))
+		row := lipgloss.NewStyle().Width(w).Background(background).Render(content)
+		msgContents = append(msgContents, row)
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, msgContents...)
+}
+
+func renderContent(message Message) string {
+	return message.Text + "\n" + senderStyle.Render(message.User+" • "+message.Time.Local().Format("15:04"))
 }
 
 var style = lipgloss.NewStyle().Padding(1, 2)

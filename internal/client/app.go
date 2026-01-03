@@ -47,7 +47,7 @@ func (m AppModel) Init() tea.Cmd {
 }
 
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	cmds := components.UpdateChildren(m.children, msg)
+	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -56,28 +56,45 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		var cmd tea.Cmd
+		switch m.r {
+		case LoginRoute:
+			m.children[1], cmd = m.children[1].Update(msg)
+		case ChatRoute:
+			m.children[2], cmd = m.children[2].Update(msg)
+		}
+		cmds = append(cmds, cmd)
+
+	case tea.WindowSizeMsg:
+		cmds = append(cmds, components.UpdateChildren(m.children, msg))
+
+	default:
+		cmds = append(cmds, components.UpdateChildren(m.children, msg))
+	}
+
+	switch msg := msg.(type) {
 	case login.RequestMsg:
-		return m, tea.Batch(cmds, m.LoginCommand(msg.Username, msg.NewUser))
+		return m, tea.Batch(tea.Batch(cmds...), m.LoginCommand(msg.Username, msg.NewUser))
 
 	case LoginResultMsg:
 		if msg.success {
 			m.r = ChatRoute
 		} else {
 			errMsg := fmt.Sprintf("Login failed: %s", msg.explanation)
-			return m, tea.Batch(cmds, login.ResetCmd(errMsg))
+			return m, tea.Batch(tea.Batch(cmds...), login.ResetCmd(errMsg))
 		}
 
 	case overview.LoadRequestMsg:
-		return m, tea.Batch(cmds, m.LoadResponseCmd())
+		return m, tea.Batch(tea.Batch(cmds...), m.LoadResponseCmd())
 
 	case messages.LoadRequest:
-		return m, tea.Batch(cmds, m.LoadMsgCmd(msg.Topic))
+		return m, tea.Batch(tea.Batch(cmds...), m.LoadMsgCmd(msg.Topic))
 
 	case input.NewMessageMsg:
-		return m, tea.Batch(cmds, m.SendMessageCmd(msg.Topic, msg.Text))
+		return m, tea.Batch(tea.Batch(cmds...), m.SendMessageCmd(msg.Topic, msg.Text))
 	}
 
-	return m, cmds
+	return m, tea.Batch(cmds...)
 }
 
 func (m AppModel) View() string {

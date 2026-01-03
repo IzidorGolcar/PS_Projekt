@@ -29,7 +29,7 @@ func NewService(ctx context.Context, config config.NodeConfig) *Service {
 	s := &Service{
 		ctx:            ctx,
 		database:       database,
-		requestsServer: requests.NewServer(ctx, database, config.ServiceAddress),
+		requestsServer: requests.NewServer(ctx, database, config.ServiceAddress, config.Token),
 		control:        control.NewServer(ctx, config.ControlListenerAddress, node),
 		node:           node,
 	}

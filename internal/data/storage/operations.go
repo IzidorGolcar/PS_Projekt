@@ -105,8 +105,13 @@ func (d *AppDatabase) UpdateMessage(ctx context.Context, userId, messageId int64
 	return d.Messages().Get(id)
 }
 
-func (d *AppDatabase) SubscribeTopic(ctx context.Context, topics []int64) <-chan *entities.Message {
-	out := make(chan *entities.Message, 100)
+type MessageEvent struct {
+	Message   *entities.Message
+	Operation datalink.Operation
+}
+
+func (d *AppDatabase) SubscribeTopic(ctx context.Context, topics []int64) <-chan MessageEvent {
+	out := make(chan MessageEvent, 100)
 	go func() {
 		defer close(out)
 		for dl := range d.chain.Observe(ctx) {
@@ -120,7 +125,10 @@ func (d *AppDatabase) SubscribeTopic(ctx context.Context, topics []int64) <-chan
 
 				for _, t := range topics {
 					if t == msg.TopicId {
-						out <- msg
+						out <- MessageEvent{
+							Message:   msg,
+							Operation: dl.Op,
+						}
 					}
 				}
 			}

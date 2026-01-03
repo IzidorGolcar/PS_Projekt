@@ -15,7 +15,7 @@ func Example() {
 	node, err := c.StartNewDataNode(
 		NewNodeConfig(
 			"node1", "/Users/izidor/Downloads/node1.log",
-			":6971", ":6981", ":6991",
+			"secret!!!", ":6971", ":6981", ":6991",
 		),
 	)
 	if err != nil {

@@ -27,10 +27,28 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	ovw, ovwCmd := m.overview.Update(msg)
-	mssg, mssgCmd := m.messages.Update(msg)
-	m.overview = ovw.(overview.Model)
-	m.messages = mssg.(chat.Model)
+	var ovwCmd, mssgCmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "down":
+			var ovw tea.Model
+			ovw, ovwCmd = m.overview.Update(msg)
+			m.overview = ovw.(overview.Model)
+		default:
+			var mssg tea.Model
+			mssg, mssgCmd = m.messages.Update(msg)
+			m.messages = mssg.(chat.Model)
+		}
+	default:
+		var ovw, mssg tea.Model
+		ovw, ovwCmd = m.overview.Update(msg)
+		mssg, mssgCmd = m.messages.Update(msg)
+		m.overview = ovw.(overview.Model)
+		m.messages = mssg.(chat.Model)
+	}
+
 	return m, tea.Batch(ovwCmd, mssgCmd)
 }
 

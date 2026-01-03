@@ -29,6 +29,7 @@ func NewClient(dataExecPath string) *Client {
 type NodeConfig struct {
 	id                    string
 	loggerPath            string
+	subscriptionToken     string
 	controlAddress        string
 	dataChainAddresses    string
 	clientRequestsAddress string
@@ -40,15 +41,28 @@ type NodeDescriptor struct {
 	config NodeConfig
 }
 
+func (n NodeDescriptor) Role() controllink.NodeRole {
+	return n.role
+}
+
+func (n NodeDescriptor) SubscriptionToken() string {
+	return n.config.subscriptionToken
+}
+
 func NewNodeConfig(
-	id string, loggerPath string,
-	controlAddress string, dataChainAddresses string,
+	id string,
+	loggerPath string,
+	subscriptionToken string,
+	controlAddress string,
+	dataChainAddresses string,
 	clientRequestsAddress string,
 ) NodeConfig {
 	return NodeConfig{
-		id: id, loggerPath: loggerPath, controlAddress: controlAddress,
+		id: id, loggerPath: loggerPath,
+		controlAddress:        controlAddress,
 		dataChainAddresses:    dataChainAddresses,
 		clientRequestsAddress: clientRequestsAddress,
+		subscriptionToken:     subscriptionToken,
 	}
 }
 
@@ -57,7 +71,7 @@ func (c *Client) StartNewDataNode(cfg NodeConfig) (*NodeDescriptor, error) {
 		c.dataExecPath,
 		"-id", cfg.id, "-o", cfg.loggerPath, "-control",
 		cfg.controlAddress, "-chain", cfg.dataChainAddresses,
-		"-service", cfg.clientRequestsAddress,
+		"-service", cfg.clientRequestsAddress, "-token", cfg.subscriptionToken,
 	)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{

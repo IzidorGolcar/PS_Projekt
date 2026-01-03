@@ -16,7 +16,6 @@ type LoginResultMsg struct {
 
 func (m AppModel) LoginCommand(username string, newUser bool) tea.Cmd {
 	return func() tea.Msg {
-
 		if newUser {
 			err := m.client.SignUp(username)
 			if err == nil {
@@ -31,8 +30,17 @@ func (m AppModel) LoginCommand(username string, newUser bool) tea.Cmd {
 			}
 		}
 
-		panic("not implemented")
-		return LoginResultMsg{}
+		err := m.client.Login(username)
+		if err == nil {
+			return LoginResultMsg{
+				success: true,
+			}
+		}
+		log.Println("failed to login:", err)
+		return LoginResultMsg{
+			success:     false,
+			explanation: err.Error(),
+		}
 	}
 }
 
@@ -68,7 +76,17 @@ func (m AppModel) LoadMsgCmd(topic overview.Topic) tea.Cmd {
 
 		items := make([]messages.Message, len(res))
 		for i, msg := range res {
-			items[i] = messages.Message{Text: msg.GetText(), User: "todo: username", Time: msg.GetCreatedAt().AsTime()}
+			username, err := m.client.GetUsername(int(msg.GetUserId()))
+			if err != nil {
+				log.Println("failed to get username:", err)
+			}
+
+			items[i] = messages.Message{
+				MyMessage: msg.GetUserId() == int64(m.client.UserId()),
+				Text:      msg.GetText(),
+				User:      username,
+				Time:      msg.GetCreatedAt().AsTime(),
+			}
 		}
 
 		sort.Slice(items, func(i, j int) bool {

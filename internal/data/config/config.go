@@ -8,6 +8,7 @@ type NodeConfig struct {
 	ChainListenerAddress   string
 	ControlListenerAddress string
 	LogPath                string
+	Token                  string
 }
 
 func Load() NodeConfig {
@@ -15,6 +16,7 @@ func Load() NodeConfig {
 	serviceAddress := flag.String("service", ":0", "Service address")
 	chainListenerAddress := flag.String("chain", ":0", "ReplicationHandler listener address")
 	controlListenerAddress := flag.String("control", ":0", "Control listener address")
+	token := flag.String("token", "", "Token")
 	logPath := flag.String("o", "", "Log path")
 	flag.Parse()
 
@@ -23,6 +25,7 @@ func Load() NodeConfig {
 		ServiceAddress:         *serviceAddress,
 		ChainListenerAddress:   *chainListenerAddress,
 		ControlListenerAddress: *controlListenerAddress,
+		Token:                  *token,
 		LogPath:                *logPath,
 	}
 }

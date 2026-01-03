@@ -10,7 +10,8 @@ import (
 )
 
 type listener struct {
-	db *storage.AppDatabase
+	subToken string
+	db       *storage.AppDatabase
 	razpravljalnica.UnimplementedMessageBoardServer
 }
 
@@ -22,8 +23,13 @@ type Server struct {
 	rpcServer *rpc.Server
 }
 
-func NewServer(ctx context.Context, database *storage.AppDatabase, addr string) *Server {
-	l := &listener{db: database}
+func NewServer(
+	ctx context.Context,
+	database *storage.AppDatabase,
+	addr string,
+	subToken string,
+) *Server {
+	l := &listener{db: database, subToken: subToken}
 	s := rpc.NewServer(ctx, l, addr)
 	return &Server{
 		rpcServer: s,
