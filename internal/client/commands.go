@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"google.golang.org/grpc/status"
 )
 
 type LoginResultMsg struct {
@@ -24,9 +25,10 @@ func (m AppModel) LoginCommand(username string, newUser bool) tea.Cmd {
 				}
 			}
 			log.Println("failed to sign up:", err)
+			s := status.Convert(err)
 			return LoginResultMsg{
 				success:     false,
-				explanation: err.Error(),
+				explanation: s.Message(),
 			}
 		}
 
@@ -37,9 +39,10 @@ func (m AppModel) LoginCommand(username string, newUser bool) tea.Cmd {
 			}
 		}
 		log.Println("failed to login:", err)
+		s := status.Convert(err)
 		return LoginResultMsg{
 			success:     false,
-			explanation: err.Error(),
+			explanation: s.Message(),
 		}
 	}
 }
