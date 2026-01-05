@@ -1,4 +1,4 @@
-package commands
+package dataplane
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ func Example() {
 
 	// 1. Start a new node
 	fmt.Println("Starting a new node")
-	c := NewClient("/Users/izidor/Code/UNI/PS/seminarska/build/data_service")
+	c := NewManager("/Users/izidor/Code/UNI/PS/seminarska/build/data_service")
 	node, err := c.StartNewDataNode(
 		NewNodeConfig(
 			"node1", "/Users/izidor/Downloads/node1.log",

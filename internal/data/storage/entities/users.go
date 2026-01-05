@@ -1,7 +1,7 @@
 package entities
 
 type User struct {
-	baseEntity
+	BaseEntity
 	Name string `db:"unique"`
 }
 

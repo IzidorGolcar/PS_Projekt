@@ -2,9 +2,9 @@ package replication
 
 import (
 	"context"
-	"seminarska/internal/common/broadcast"
 	"seminarska/internal/data/storage/db"
 	"seminarska/internal/data/storage/entities"
+	"seminarska/internal/data/storage/replication/broadcast"
 	"seminarska/proto/datalink"
 	"sync"
 )

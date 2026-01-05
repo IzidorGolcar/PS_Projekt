@@ -1,7 +1,7 @@
 package entities
 
 type Like struct {
-	baseEntity
+	BaseEntity
 	UserId    int64 `db:"unique"`
 	MessageId int64 `db:"unique"`
 }

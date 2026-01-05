@@ -1,7 +1,7 @@
 package entities
 
 type Topic struct {
-	baseEntity
+	BaseEntity
 	Name string `db:"unique"`
 }
 

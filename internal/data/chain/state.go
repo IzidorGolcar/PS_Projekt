@@ -93,7 +93,7 @@ func (d *NodeDFA) Emit(e event) error {
 			return illegalTransitionError(d.lastState, e)
 		}
 	case SuccessorConnect:
-		if d.lastState.Role == Confirmer {
+		if d.lastState.Role == Confirmer || d.lastState.Role == ReaderConfirmer {
 			return illegalTransitionError(d.lastState, e)
 		}
 		switch d.lastState.Position {

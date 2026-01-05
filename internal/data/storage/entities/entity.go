@@ -5,14 +5,14 @@ type Entity interface {
 	Id() int64
 }
 
-type baseEntity struct {
+type BaseEntity struct {
 	id int64
 }
 
-func (b *baseEntity) SetId(id int64) {
+func (b *BaseEntity) SetId(id int64) {
 	b.id = id
 }
 
-func (b *baseEntity) Id() int64 {
+func (b *BaseEntity) Id() int64 {
 	return b.id
 }

@@ -6,8 +6,8 @@ import (
 	"log"
 	"net"
 	"seminarska/internal/common/rpc"
-	"seminarska/internal/common/stream"
 	"seminarska/internal/data/chain/handshake"
+	"seminarska/internal/data/chain/stream"
 	"seminarska/proto/datalink"
 	"sync"
 

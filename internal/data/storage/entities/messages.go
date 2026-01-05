@@ -5,7 +5,7 @@ import (
 )
 
 type Message struct {
-	baseEntity
+	BaseEntity
 	TopicId   int64 `db:"unique"`
 	UserId    int64 `db:"unique"`
 	Text      string

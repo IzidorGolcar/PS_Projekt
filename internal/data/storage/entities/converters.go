@@ -20,7 +20,7 @@ func DatalinkToEntity(dl *datalink.Message) (entity Entity, err error) {
 		)
 		entity.SetId(p.Message.Id)
 	case *datalink.Message_Like:
-		entity = NewLike(p.Like.MessageId, p.Like.UserId)
+		entity = NewLike(p.Like.UserId, p.Like.MessageId)
 		entity.SetId(p.Like.Id)
 	case *datalink.Message_Topic:
 		entity = NewTopic(p.Topic.Name)

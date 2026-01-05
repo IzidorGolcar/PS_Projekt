@@ -3,6 +3,7 @@ package chain
 import (
 	"errors"
 	"math"
+	"strconv"
 	"sync"
 )
 
@@ -33,7 +34,7 @@ func (b *ReplayBuffer[T]) Add(messages ...T) error {
 	defer b.mx.Unlock()
 	for _, msg := range messages {
 		if len(b.buffer) > 0 && msg.GetMessageIndex() <= b.buffer[len(b.buffer)-1].GetMessageIndex() {
-			return ErrIndexOutOfOrder
+			return errors.Join(ErrIndexOutOfOrder, errors.New(strconv.Itoa(int(msg.GetMessageIndex()))))
 		}
 		b.buffer = append(b.buffer, msg)
 		if len(b.buffer) > b.size {
@@ -61,6 +62,9 @@ func (b *ReplayBuffer[T]) MessagesAfter(index int32) ([]T, error) {
 				return []T{}, nil
 			}
 			return b.buffer[i+1:], nil
+		}
+		if msg.GetMessageIndex() == index+1 {
+			return b.buffer[i:], nil
 		}
 		if msg.GetMessageIndex() > index {
 			return b.buffer[i:], ErrIncompleteResult

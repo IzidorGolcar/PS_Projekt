@@ -36,6 +36,7 @@ func (i Index) Add(e entities.Entity) error {
 		return ErrConstraint
 	}
 	i.set[key] = struct{}{}
+	i.ids[e.Id()] = struct{}{}
 	return nil
 }
 

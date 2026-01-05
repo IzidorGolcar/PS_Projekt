@@ -107,19 +107,11 @@ func (o *BufferedInterceptor) ProcessMessages(messages []*datalink.Message) {
 			log.Println("Failed to process message: ", err)
 		}
 	}
-	err := o.messages.Add(messages...)
-	if err != nil {
-		log.Println("Failed to buffer message: ", err)
-	}
 }
 
 func (o *BufferedInterceptor) ProcessConfirmations(confirmations []*datalink.Confirmation) {
 	for _, conf := range confirmations {
 		o.OnConfirmation(conf)
-	}
-	err := o.confirmations.Add(confirmations...)
-	if err != nil {
-		log.Println("Failed to buffer confirmation: ", err)
 	}
 }
 
