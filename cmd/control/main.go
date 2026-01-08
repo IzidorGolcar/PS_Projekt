@@ -10,15 +10,23 @@ import (
 	"strings"
 	"time"
 
+	"seminarska/internal/common/rpc"
+	"seminarska/internal/control/dataplane"
 	"seminarska/internal/control/raft"
+	"seminarska/proto/controllink"
+	"seminarska/proto/razpravljalnica"
+
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func main() {
 	// Parse command line flags
 	nodeID := flag.String("id", "", "Node ID (required)")
-	addr := flag.String("addr", ":7000", "Address to listen on for Raft RPCs")
+	addr := flag.String("addr", ":8080", "Address to listen on for client gRPC")
 	peers := flag.String("peers", "", "Comma-separated list of peer addresses (e.g., :7001,:7002)")
 	peerIDs := flag.String("peer-ids", "", "Comma-separated list of peer IDs (e.g., node2,node3)")
+	dataExec := flag.String("data-exec", "", "Path to data node executable")
 	flag.Parse()
 
 	if *nodeID == "" {
@@ -70,12 +78,40 @@ func main() {
 	// Create cluster manager
 	clusterManager = raft.NewClusterManager(ctx, raftNode)
 
+	// Create dataplane manager and start data nodes if executable provided
+	var manager *dataplane.Manager
+	var nodes []dataplane.NodeDescriptor
+
+	if *dataExec != "" {
+		manager = dataplane.NewManager(*dataExec)
+		nodes = launchDataNodes(manager)
+		log.Printf("Launched %d data nodes", len(nodes))
+	}
+
+	// Create and start gRPC server for client requests
+	handler := &controlPlaneHandler{
+		clusterManager: clusterManager,
+		raftNode:       raftNode,
+		nodes:          nodes,
+	}
+	rpcServer := rpc.NewServer(ctx, handler, *addr)
+
 	log.Println("Control plane started")
+	log.Printf("Listening on %s", *addr)
 
 	// Wait for interrupt
 	<-ctx.Done()
 
 	log.Println("Shutting down...")
+
+	// Terminate data nodes
+	if manager != nil {
+		for i := range nodes {
+			if err := manager.TerminateDataNode(&nodes[i]); err != nil {
+				log.Printf("Failed to terminate node: %v", err)
+			}
+		}
+	}
 
 	// Graceful shutdown
 	clusterManager.Stop()
@@ -89,5 +125,127 @@ func main() {
 	}
 
 	<-clusterManager.Done()
+	<-rpcServer.Done()
 	log.Println("Control plane stopped")
+}
+
+// launchDataNodes starts data nodes and connects them in a chain (like mock_control)
+func launchDataNodes(manager *dataplane.Manager) []dataplane.NodeDescriptor {
+	head, err := manager.StartNewDataNode(dataplane.NewNodeConfig(
+		"node1", os.DevNull,
+		"secret", ":6971", ":6981", ":6991",
+	))
+	if err != nil {
+		log.Printf("Failed to start head node: %v", err)
+		return nil
+	}
+
+	mid, err := manager.StartNewDataNode(dataplane.NewNodeConfig(
+		"node2", os.DevNull,
+		"secret", ":6972", ":6982", ":6992",
+	))
+	if err != nil {
+		log.Printf("Failed to start mid node: %v", err)
+		return nil
+	}
+
+	tail, err := manager.StartNewDataNode(dataplane.NewNodeConfig(
+		"node3", os.DevNull,
+		"secret", ":6973", ":6983", ":6993",
+	))
+	if err != nil {
+		log.Printf("Failed to start tail node: %v", err)
+		return nil
+	}
+
+	time.Sleep(time.Second) // Give nodes time to start
+
+	// Set roles
+	if err := manager.SwitchNodeRole(head, controllink.NodeRole_MessageReader); err != nil {
+		log.Printf("Failed to set head role: %v", err)
+	}
+	if err := manager.SwitchNodeRole(mid, controllink.NodeRole_Relay); err != nil {
+		log.Printf("Failed to set mid role: %v", err)
+	}
+	if err := manager.SwitchNodeRole(tail, controllink.NodeRole_MessageConfirmer); err != nil {
+		log.Printf("Failed to set tail role: %v", err)
+	}
+
+	// Connect the chain
+	if err := manager.SwitchDataNodeSuccessor(head, mid); err != nil {
+		log.Printf("Failed to connect head->mid: %v", err)
+	}
+	if err := manager.SwitchDataNodeSuccessor(mid, tail); err != nil {
+		log.Printf("Failed to connect mid->tail: %v", err)
+	}
+
+	return []dataplane.NodeDescriptor{*head, *mid, *tail}
+}
+
+// controlPlaneHandler implements the ControlPlane gRPC service
+type controlPlaneHandler struct {
+	razpravljalnica.UnimplementedControlPlaneServer
+	clusterManager *raft.ClusterManager
+	raftNode       *raft.Node
+	nodes          []dataplane.NodeDescriptor
+}
+
+func (h *controlPlaneHandler) Register(grpcServer *grpc.Server) {
+	razpravljalnica.RegisterControlPlaneServer(grpcServer, h)
+}
+
+func (h *controlPlaneHandler) GetClusterState(
+	_ context.Context, _ *emptypb.Empty,
+) (*razpravljalnica.GetClusterStateResponse, error) {
+	if len(h.nodes) >= 3 {
+		return &razpravljalnica.GetClusterStateResponse{
+			Head: h.nodes[0].NodeInfo(),
+			Tail: h.nodes[len(h.nodes)-1].NodeInfo(),
+		}, nil
+	}
+
+	// Fallback to ClusterManager state
+	head, tail, _ := h.clusterManager.GetChainState()
+	resp := &razpravljalnica.GetClusterStateResponse{}
+	if head != nil {
+		resp.Head = &razpravljalnica.NodeInfo{
+			NodeId:  head.NodeID,
+			Address: head.ServiceAddress,
+		}
+	}
+	if tail != nil {
+		resp.Tail = &razpravljalnica.NodeInfo{
+			NodeId:  tail.NodeID,
+			Address: tail.ServiceAddress,
+		}
+	}
+	return resp, nil
+}
+
+func (h *controlPlaneHandler) GetSubcscriptionNode(
+	_ context.Context, _ *razpravljalnica.SubscriptionNodeRequest,
+) (*razpravljalnica.SubscriptionNodeResponse, error) {
+	// Return middle node for subscriptions (like mock_control)
+	if len(h.nodes) >= 2 {
+		midIdx := len(h.nodes) / 2
+		return &razpravljalnica.SubscriptionNodeResponse{
+			SubscribeToken: h.nodes[midIdx].SubscriptionToken(),
+			Node:           h.nodes[midIdx].NodeInfo(),
+		}, nil
+	}
+
+	// Fallback
+	_, _, nodes := h.clusterManager.GetChainState()
+	if len(nodes) > 0 {
+		midIdx := len(nodes) / 2
+		return &razpravljalnica.SubscriptionNodeResponse{
+			SubscribeToken: "secret",
+			Node: &razpravljalnica.NodeInfo{
+				NodeId:  nodes[midIdx].NodeID,
+				Address: nodes[midIdx].ServiceAddress,
+			},
+		}, nil
+	}
+
+	return &razpravljalnica.SubscriptionNodeResponse{}, nil
 }

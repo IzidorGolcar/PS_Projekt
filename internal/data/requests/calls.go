@@ -7,7 +7,6 @@ import (
 	"seminarska/proto/datalink"
 	"seminarska/proto/razpravljalnica"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -166,12 +165,12 @@ func (l *listener) GetMessages(
 
 func (l *listener) SubscribeTopic(
 	request *razpravljalnica.SubscribeTopicRequest,
-	g grpc.ServerStreamingServer[razpravljalnica.MessageEvent],
+	stream razpravljalnica.MessageBoard_SubscribeTopicServer,
 ) error {
 	if request.GetSubscribeToken() != l.subToken {
 		return status.Error(codes.Unauthenticated, "invalid token")
 	}
-	for e := range l.db.SubscribeTopic(g.Context(), request.GetTopicId()) {
+	for e := range l.db.SubscribeTopic(stream.Context(), request.GetTopicId()) {
 		var op razpravljalnica.OpType
 		switch e.Operation {
 		case datalink.Operation_Delete:
@@ -191,7 +190,7 @@ func (l *listener) SubscribeTopic(
 			return err
 		}
 		rMessage.Message.Likes = int32(likes)
-		err = g.Send(rMessage)
+		err = stream.Send(rMessage)
 		if err != nil {
 			return err
 		}

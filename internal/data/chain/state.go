@@ -19,7 +19,7 @@ func (s NodeState) String() string {
 	if s.illegal {
 		return "(Illegal)"
 	}
-	return fmt.Sprintf("(%s; %s)", s.Position, s.Role)
+	return fmt.Sprintf("(%v; %v)", s.Position, s.Role)
 }
 
 //go:generate stringer -type=Position
@@ -150,5 +150,5 @@ func (d *NodeDFA) Emit(e event) error {
 }
 
 func illegalTransitionError(state NodeState, t event) error {
-	return fmt.Errorf("illegal transition: %s%s", t, state)
+	return fmt.Errorf("illegal transition: %v -> %v", t, state)
 }
