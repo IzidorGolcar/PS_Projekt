@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"seminarska/internal/common/rpc"
@@ -84,14 +86,49 @@ func main() {
 	raftServer := raft.NewRaftServer(ctx, *raftAddr, raftNode, clusterManager)
 	_ = raftServer // Server runs in background goroutine
 
-	// Create dataplane manager and start data nodes if executable provided
 	var manager *dataplane.Manager
 	var nodes []dataplane.NodeDescriptor
+	var nodeCounter atomic.Int32
+	var nodesMu sync.Mutex
 
 	if *dataExec != "" {
 		manager = dataplane.NewManager(*dataExec)
 		nodes = launchDataNodes(manager)
+		nodeCounter.Store(int32(len(nodes)))
 		log.Printf("Launched %d data nodes", len(nodes))
+
+		clusterManager.SetSpawnFunc(func() (*raft.ChainNode, error) {
+			nodeNum := nodeCounter.Add(1)
+			basePort := 6970 + int(nodeNum)*10
+
+			cfg := dataplane.NewNodeConfig(
+				fmt.Sprintf("node%d", nodeNum),
+				os.DevNull,
+				"secret",
+				fmt.Sprintf(":%d", basePort+1),  // control
+				fmt.Sprintf(":%d", basePort+11), // chain
+				fmt.Sprintf(":%d", basePort+21), // service
+			)
+
+			desc, err := manager.StartNewDataNode(cfg)
+			if err != nil {
+				return nil, err
+			}
+
+			time.Sleep(500 * time.Millisecond)
+
+			nodesMu.Lock()
+			nodes = append(nodes, *desc)
+			nodesMu.Unlock()
+
+			return &raft.ChainNode{
+				NodeID:         cfg.Id,
+				ControlAddress: cfg.ControlAddress,
+				ChainAddress:   cfg.DataChainAddresses,
+				ServiceAddress: cfg.ClientRequestsAddress,
+				IsAlive:        true,
+			}, nil
+		})
 	}
 
 	// Create and start gRPC server for client requests

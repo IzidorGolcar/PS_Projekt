@@ -11,7 +11,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// ClusterManager manages the data plane cluster state and chain reconfiguration
+type NodeSpawnFunc func() (*ChainNode, error)
+
 type ClusterManager struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -19,14 +20,14 @@ type ClusterManager struct {
 	raftNode      *Node
 	healthChecker *HealthChecker
 
-	// Current chain state
 	chainNodes []ChainNode
 	chainMu    sync.RWMutex
+
+	spawnNode NodeSpawnFunc
 
 	done chan struct{}
 }
 
-// NewClusterManager creates a new cluster manager
 func NewClusterManager(ctx context.Context, raftNode *Node) *ClusterManager {
 	ctx, cancel := context.WithCancel(ctx)
 	cm := &ClusterManager{
@@ -37,20 +38,21 @@ func NewClusterManager(ctx context.Context, raftNode *Node) *ClusterManager {
 		done:       make(chan struct{}),
 	}
 
-	// Create health checker with callback
 	cm.healthChecker = NewHealthChecker(ctx, cm.onNodeFailed)
 
 	go cm.run()
 	return cm
 }
 
-// AddDataNode adds a new data node to the chain
+func (cm *ClusterManager) SetSpawnFunc(fn NodeSpawnFunc) {
+	cm.spawnNode = fn
+}
+
 func (cm *ClusterManager) AddDataNode(node ChainNode) error {
 	if !cm.raftNode.IsLeader() {
 		return ErrNotLeader
 	}
 
-	// Create command to add node
 	payload, _ := json.Marshal(node)
 	cmd := Command{
 		Type:    CmdAddNode,
@@ -60,7 +62,6 @@ func (cm *ClusterManager) AddDataNode(node ChainNode) error {
 	return cm.raftNode.SubmitCommand(cmd)
 }
 
-// RemoveDataNode removes a data node from the chain
 func (cm *ClusterManager) RemoveDataNode(nodeID string) error {
 	if !cm.raftNode.IsLeader() {
 		return ErrNotLeader
@@ -75,7 +76,6 @@ func (cm *ClusterManager) RemoveDataNode(nodeID string) error {
 	return cm.raftNode.SubmitCommand(cmd)
 }
 
-// GetChainState returns the current chain state
 func (cm *ClusterManager) GetChainState() (head, tail *ChainNode, nodes []ChainNode) {
 	cm.chainMu.RLock()
 	defer cm.chainMu.RUnlock()
@@ -91,18 +91,16 @@ func (cm *ClusterManager) GetChainState() (head, tail *ChainNode, nodes []ChainN
 	return
 }
 
-// onNodeFailed is called when a data node fails health check
 func (cm *ClusterManager) onNodeFailed(nodeID string) {
 	if !cm.raftNode.IsLeader() {
 		return
 	}
 
-	log.Printf("[ClusterManager] Node %s failed, initiating reconfiguration", nodeID)
+	log.Printf("[ClusterManager] Node %s failed, reconfiguring chain", nodeID)
 
 	cm.chainMu.RLock()
-	var predecessorIdx int = -1
-	var successorIdx int = -1
-	var failedIdx int = -1
+	chainLen := len(cm.chainNodes)
+	var predecessorIdx, successorIdx, failedIdx int = -1, -1, -1
 
 	for i, node := range cm.chainNodes {
 		if node.NodeID == nodeID {
@@ -110,7 +108,7 @@ func (cm *ClusterManager) onNodeFailed(nodeID string) {
 			if i > 0 {
 				predecessorIdx = i - 1
 			}
-			if i < len(cm.chainNodes)-1 {
+			if i < chainLen-1 {
 				successorIdx = i + 1
 			}
 			break
@@ -121,6 +119,9 @@ func (cm *ClusterManager) onNodeFailed(nodeID string) {
 		cm.chainMu.RUnlock()
 		return
 	}
+
+	isHead := failedIdx == 0
+	isTail := failedIdx == chainLen-1
 
 	var predecessor, successor *ChainNode
 	if predecessorIdx >= 0 {
@@ -133,7 +134,7 @@ func (cm *ClusterManager) onNodeFailed(nodeID string) {
 	}
 	cm.chainMu.RUnlock()
 
-	// If there's a predecessor, tell it to switch to the successor
+	// Rewire predecessor to skip the failed node
 	if predecessor != nil {
 		newSuccessorAddr := ""
 		if successor != nil {
@@ -142,13 +143,21 @@ func (cm *ClusterManager) onNodeFailed(nodeID string) {
 		cm.sendSwitchSuccessor(predecessor.ControlAddress, newSuccessorAddr)
 	}
 
-	// Submit command to remove the failed node from cluster state
+	// Promote new head/tail
+	if isHead && successor != nil {
+		cm.sendSwitchRole(successor.ControlAddress, controllink.NodeRole_MessageReader)
+	}
+	if isTail && predecessor != nil {
+		cm.sendSwitchRole(predecessor.ControlAddress, controllink.NodeRole_MessageConfirmer)
+	}
+
 	if err := cm.RemoveDataNode(nodeID); err != nil {
 		log.Printf("[ClusterManager] Failed to remove node %s: %v", nodeID, err)
 	}
+
+	go cm.spawnReplacementNode()
 }
 
-// sendSwitchSuccessor sends a SwitchSuccessor command to a data node
 func (cm *ClusterManager) sendSwitchSuccessor(controlAddr, newSuccessorAddr string) {
 	ctx, cancel := context.WithTimeout(cm.ctx, HealthCheckTimeout*2)
 	defer cancel()
@@ -166,11 +175,55 @@ func (cm *ClusterManager) sendSwitchSuccessor(controlAddr, newSuccessorAddr stri
 	client := controllink.NewControlServiceClient(conn)
 	_, err = client.SwitchSuccessor(ctx, &controllink.SwitchSuccessorCommand{Address: newSuccessorAddr})
 	if err != nil {
-		log.Printf("[ClusterManager] Failed to send SwitchSuccessor to %s: %v", controlAddr, err)
+		log.Printf("[ClusterManager] SwitchSuccessor failed for %s: %v", controlAddr, err)
 		return
 	}
 
-	log.Printf("[ClusterManager] Sent SwitchSuccessor to %s -> %s", controlAddr, newSuccessorAddr)
+	log.Printf("[ClusterManager] SwitchSuccessor: %s -> %s", controlAddr, newSuccessorAddr)
+}
+
+func (cm *ClusterManager) sendSwitchRole(controlAddr string, role controllink.NodeRole) {
+	ctx, cancel := context.WithTimeout(cm.ctx, HealthCheckTimeout*2)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, controlAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	)
+	if err != nil {
+		log.Printf("[ClusterManager] Failed to connect to %s: %v", controlAddr, err)
+		return
+	}
+	defer conn.Close()
+
+	client := controllink.NewControlServiceClient(conn)
+	_, err = client.SwitchRole(ctx, &controllink.SwitchRoleCommand{Role: role})
+	if err != nil {
+		log.Printf("[ClusterManager] SwitchRole failed for %s: %v", controlAddr, err)
+		return
+	}
+
+	log.Printf("[ClusterManager] SwitchRole: %s -> %v", controlAddr, role)
+}
+
+func (cm *ClusterManager) spawnReplacementNode() {
+	if cm.spawnNode == nil {
+		log.Printf("[ClusterManager] No spawn function configured, skipping replacement")
+		return
+	}
+
+	node, err := cm.spawnNode()
+	if err != nil {
+		log.Printf("[ClusterManager] Failed to spawn replacement node: %v", err)
+		return
+	}
+
+	if err := cm.AddDataNode(*node); err != nil {
+		log.Printf("[ClusterManager] Failed to add replacement node: %v", err)
+		return
+	}
+
+	log.Printf("[ClusterManager] Spawned replacement node %s", node.NodeID)
 }
 
 func (cm *ClusterManager) run() {
@@ -180,18 +233,14 @@ func (cm *ClusterManager) run() {
 	<-cm.healthChecker.Done()
 }
 
-// Stop stops the cluster manager
 func (cm *ClusterManager) Stop() {
 	cm.cancel()
 }
 
-// Done returns a channel that is closed when the cluster manager stops
 func (cm *ClusterManager) Done() <-chan struct{} {
 	return cm.done
 }
 
-// ApplyCommand applies a Raft command to the cluster state
-// This is passed as the applyFunc to the Raft node
 func (cm *ClusterManager) ApplyCommand(cmd Command) error {
 	switch cmd.Type {
 	case CmdAddNode:
@@ -228,23 +277,19 @@ func (cm *ClusterManager) applyAddNode(node ChainNode) error {
 	cm.chainMu.Lock()
 	defer cm.chainMu.Unlock()
 
-	// Check if node already exists
 	for _, existing := range cm.chainNodes {
 		if existing.NodeID == node.NodeID {
 			return ErrAlreadyExists
 		}
 	}
 
-	// Add to chain
 	node.IsAlive = true
 	cm.chainNodes = append(cm.chainNodes, node)
-
-	// Add to health checker
 	cm.healthChecker.AddNode(node.NodeID, node.ControlAddress)
 
 	log.Printf("[ClusterManager] Added node %s to chain", node.NodeID)
 
-	// If this is not the first node, tell the previous tail to connect to this new node
+	// Wire previous tail to new node
 	if len(cm.chainNodes) > 1 {
 		prevTail := cm.chainNodes[len(cm.chainNodes)-2]
 		go cm.sendSwitchSuccessor(prevTail.ControlAddress, node.ChainAddress)
