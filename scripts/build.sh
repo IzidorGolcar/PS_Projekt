@@ -1,4 +1,7 @@
 echo 'building project'
+
+go install golang.org/x/tools/cmd/stringer@latest
+go mod tidy
 go generate ./...
 
 mkdir -p build
