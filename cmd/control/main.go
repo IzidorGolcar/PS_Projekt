@@ -24,6 +24,7 @@ func main() {
 	// Parse command line flags
 	nodeID := flag.String("id", "", "Node ID (required)")
 	addr := flag.String("addr", ":8080", "Address to listen on for client gRPC")
+	raftAddr := flag.String("raft-addr", ":7000", "Address for Raft peer-to-peer communication")
 	peers := flag.String("peers", "", "Comma-separated list of peer addresses (e.g., :7001,:7002)")
 	peerIDs := flag.String("peer-ids", "", "Comma-separated list of peer IDs (e.g., node2,node3)")
 	dataExec := flag.String("data-exec", "", "Path to data node executable")
@@ -62,6 +63,7 @@ func main() {
 	log.Println("Starting control plane node")
 	log.Printf("Node ID: %s", *nodeID)
 	log.Printf("Listen address: %s", *addr)
+	log.Printf("Raft address: %s", *raftAddr)
 	log.Printf("Peers: %v", peerAddrs)
 
 	// Create cluster manager (will be used as apply function)
@@ -77,6 +79,10 @@ func main() {
 
 	// Create cluster manager
 	clusterManager = raft.NewClusterManager(ctx, raftNode)
+
+	// Create Raft gRPC server for peer-to-peer Raft RPCs (RequestVote, AppendEntries)
+	raftServer := raft.NewRaftServer(ctx, *raftAddr, raftNode, clusterManager)
+	_ = raftServer // Server runs in background goroutine
 
 	// Create dataplane manager and start data nodes if executable provided
 	var manager *dataplane.Manager

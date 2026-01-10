@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"seminarska/proto/controllink"
 	"sync"
 
 	"google.golang.org/grpc"
@@ -162,9 +163,12 @@ func (cm *ClusterManager) sendSwitchSuccessor(controlAddr, newSuccessorAddr stri
 	}
 	defer conn.Close()
 
-	// TODO: Use generated proto client
-	// client := controllink.NewControlServiceClient(conn)
-	// _, err = client.SwitchSuccessor(ctx, &controllink.SwitchSuccessorCommand{Address: newSuccessorAddr})
+	client := controllink.NewControlServiceClient(conn)
+	_, err = client.SwitchSuccessor(ctx, &controllink.SwitchSuccessorCommand{Address: newSuccessorAddr})
+	if err != nil {
+		log.Printf("[ClusterManager] Failed to send SwitchSuccessor to %s: %v", controlAddr, err)
+		return
+	}
 
 	log.Printf("[ClusterManager] Sent SwitchSuccessor to %s -> %s", controlAddr, newSuccessorAddr)
 }

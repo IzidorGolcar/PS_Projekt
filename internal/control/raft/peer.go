@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	raftpb "seminarska/proto/raft"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -16,6 +18,7 @@ type peerClient struct {
 	addr    string
 	peerID  string
 	conn    *grpc.ClientConn
+	client  raftpb.RaftServiceClient
 	connMu  sync.RWMutex
 	healthy bool
 }
@@ -25,7 +28,7 @@ func newPeerClient(ctx context.Context, addr string, peerID string) *peerClient 
 		ctx:     ctx,
 		addr:    addr,
 		peerID:  peerID,
-		healthy: true,
+		healthy: false,
 	}
 	go pc.maintainConnection()
 	return pc
@@ -63,12 +66,13 @@ func (pc *peerClient) connect() {
 		grpc.WithBlock(),
 	)
 	if err != nil {
-		log.Printf("[Raft Peer %s] Failed to connect to %s: %v", pc.peerID, pc.addr, err)
+		// Don't spam logs with connection failures
 		pc.healthy = false
 		return
 	}
 
 	pc.conn = conn
+	pc.client = raftpb.NewRaftServiceClient(conn)
 	pc.healthy = true
 	log.Printf("[Raft Peer %s] Connected to %s", pc.peerID, pc.addr)
 }
@@ -85,55 +89,88 @@ func (pc *peerClient) closeConnection() {
 	if pc.conn != nil {
 		pc.conn.Close()
 		pc.conn = nil
+		pc.client = nil
 	}
+}
+
+func (pc *peerClient) getClient() raftpb.RaftServiceClient {
+	pc.connMu.RLock()
+	defer pc.connMu.RUnlock()
+	return pc.client
 }
 
 // RequestVote sends a RequestVote RPC to this peer
 func (pc *peerClient) RequestVote(req RequestVoteRequest) (RequestVoteResponse, error) {
-	conn := pc.getConn()
-	if conn == nil {
+	client := pc.getClient()
+	if client == nil {
 		return RequestVoteResponse{}, ErrTimeout
 	}
 
-	ctx, cancel := context.WithTimeout(pc.ctx, 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(pc.ctx, 150*time.Millisecond)
 	defer cancel()
 
-	// For now, we'll use a simple unary RPC
-	// This will be replaced with the generated proto client
-	var resp RequestVoteResponse
-
-	// TODO: Replace with actual gRPC call when proto is generated
-	// client := raft.NewRaftServiceClient(conn)
-	// protoResp, err := client.RequestVote(ctx, &raft.RequestVoteRequest{...})
-
-	// Simulate the RPC for now - will be replaced with real implementation
-	_ = ctx
-	resp = RequestVoteResponse{
-		Term:        req.Term,
-		VoteGranted: false,
+	protoReq := &raftpb.RequestVoteRequest{
+		Term:         req.Term,
+		CandidateId:  req.CandidateID,
+		LastLogIndex: req.LastLogIndex,
+		LastLogTerm:  req.LastLogTerm,
 	}
 
-	return resp, nil
+	protoResp, err := client.RequestVote(ctx, protoReq)
+	if err != nil {
+		pc.connMu.Lock()
+		pc.healthy = false
+		pc.connMu.Unlock()
+		return RequestVoteResponse{}, err
+	}
+
+	return RequestVoteResponse{
+		Term:        protoResp.Term,
+		VoteGranted: protoResp.VoteGranted,
+	}, nil
 }
 
 // AppendEntries sends an AppendEntries RPC to this peer
 func (pc *peerClient) AppendEntries(req AppendEntriesRequest) (AppendEntriesResponse, error) {
-	conn := pc.getConn()
-	if conn == nil {
+	client := pc.getClient()
+	if client == nil {
 		return AppendEntriesResponse{}, ErrTimeout
 	}
 
-	ctx, cancel := context.WithTimeout(pc.ctx, 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(pc.ctx, 150*time.Millisecond)
 	defer cancel()
 
-	// TODO: Replace with actual gRPC call when proto is generated
-	_ = ctx
-	resp := AppendEntriesResponse{
-		Term:    req.Term,
-		Success: true,
+	// Convert entries to proto format
+	protoEntries := make([]*raftpb.LogEntry, len(req.Entries))
+	for i, e := range req.Entries {
+		protoEntries[i] = &raftpb.LogEntry{
+			Term:    e.Term,
+			Index:   e.Index,
+			Command: e.Command,
+		}
 	}
 
-	return resp, nil
+	protoReq := &raftpb.AppendEntriesRequest{
+		Term:         req.Term,
+		LeaderId:     req.LeaderID,
+		PrevLogIndex: req.PrevLogIndex,
+		PrevLogTerm:  req.PrevLogTerm,
+		Entries:      protoEntries,
+		LeaderCommit: req.LeaderCommit,
+	}
+
+	protoResp, err := client.AppendEntries(ctx, protoReq)
+	if err != nil {
+		pc.connMu.Lock()
+		pc.healthy = false
+		pc.connMu.Unlock()
+		return AppendEntriesResponse{}, err
+	}
+
+	return AppendEntriesResponse{
+		Term:    protoResp.Term,
+		Success: protoResp.Success,
+	}, nil
 }
 
 // IsHealthy returns whether this peer is reachable

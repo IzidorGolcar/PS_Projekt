@@ -6,8 +6,11 @@ import (
 	"sync"
 	"time"
 
+	"seminarska/proto/controllink"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // HealthChecker monitors the health of data nodes in the chain
@@ -30,6 +33,7 @@ type dataNodeClient struct {
 	nodeID         string
 	controlAddress string
 	conn           *grpc.ClientConn
+	client         controllink.ControlServiceClient
 	healthy        bool
 	failCount      int
 	mu             sync.Mutex
@@ -140,23 +144,42 @@ func (hc *HealthChecker) checkNode(node *dataNodeClient) {
 		cancel()
 
 		if err != nil {
-			node.failCount++
-			if node.failCount >= 3 && node.healthy {
-				node.healthy = false
-				log.Printf("[HealthChecker] Node %s is DOWN after %d failures", node.nodeID, node.failCount)
-				if hc.onNodeFailed != nil {
-					go hc.onNodeFailed(node.nodeID)
-				}
-			}
+			hc.handleNodeFailure(node)
 			return
 		}
 		node.conn = conn
+		node.client = controllink.NewControlServiceClient(conn)
 	}
 
-	// Connection exists - node is healthy
+	// Actually ping the node to check if it's healthy
+	ctx, cancel := context.WithTimeout(hc.ctx, HealthCheckTimeout)
+	defer cancel()
+
+	_, err := node.client.Ping(ctx, &emptypb.Empty{})
+	if err != nil {
+		// Ping failed - close connection and mark for reconnection
+		node.conn.Close()
+		node.conn = nil
+		node.client = nil
+		hc.handleNodeFailure(node)
+		return
+	}
+
+	// Ping succeeded - node is healthy
 	node.failCount = 0
 	if !node.healthy {
 		node.healthy = true
 		log.Printf("[HealthChecker] Node %s is UP", node.nodeID)
+	}
+}
+
+func (hc *HealthChecker) handleNodeFailure(node *dataNodeClient) {
+	node.failCount++
+	if node.failCount >= 3 && node.healthy {
+		node.healthy = false
+		log.Printf("[HealthChecker] Node %s is DOWN after %d failures", node.nodeID, node.failCount)
+		if hc.onNodeFailed != nil {
+			go hc.onNodeFailed(node.nodeID)
+		}
 	}
 }
