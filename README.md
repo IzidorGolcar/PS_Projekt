@@ -38,15 +38,19 @@ internal se deli na module:
 ★ Zanesljiva bločna replikacija
 : Modul [chain](internal/data/chain) poskrbi za varno replikacijo sporočil.
 
-★ Polna podpora za RAFT protokol
-: Modul [raft](internal/control/raft) implementira vse potrebne funkcionalnosti za RAFT protokol.
+★ RAFT replikacija nadzorne ravnine
+: Nadzorna ravnina se replicira z uporabo knjižnice [Hashicorp Raft](https://github.com/hashicorp/raft) 
+ali pa z lastno implementacijo RAFT protokola.
 
 ★ Abstrakcija med podatkovno in nadzorno ravnino
 : Podatkovna ravnina je odgovorna izključno za podatke, nadzorna pa za nadzor stanja podatkovne verige.\
-Podatki nikoli, niti med prevezovanjem, ne prehajajo med ravninama.
+Podatki nikoli, niti med prevezovanjem, ne prehajajo med ravninama. To omogoča protokol rokovanja med podatkovni vozlišči ([chain/handshake](internal/data/chain/handshake)).
 
 ★ TUI in CLI odjemalca
 : Na voljo sta odjemalca za interakcijo z ukazno vrstico ali grafičnim vmesnikom v terminalu.
+
+★ Pregleden ukazni vmesnik
+: Ukazni vmesnik je organiziran s paketom [Cobra](https://github.com/spf13/cobra)
 
 ★ Pokritost z unit testi
 : `go test ./...`
@@ -55,15 +59,40 @@ Podatki nikoli, niti med prevezovanjem, ne prehajajo med ravninama.
 
 1. Za vzpostavitev sistema moramo zgolj zagnati nadzorno ravnino.
    ```shell
-   ./build/control_service -config ... todo
+   DATA_NODE_EXEC = <path/to/data_service/executable>
+   
+   # Launch bootstrapped control node
+   control_service launch \
+      --node-id node1 \
+      --raft-addr 127.0.0.1:5301 \
+      --http-addr :8301 \
+      --rpc-addr :8080 \
+      --data-exec $DATA_NODE_EXEC \
+      --bootstrap
+   
+   ... launch additional nodes without bootstrap flag
+   ```
+   
+   Zagnana vozlišča povežemo v gručo:
+   ```shell
+   control_service link \
+      --src "localhost:8301" \
+      --target "127.0.0.1:5302" \
+      --target-id node2
+   ```
+   
+   Za nadzor stanja sistema lahko uporabimo ukaz `state`:
+   ```shell
+   control_service state \```
+         --addr "localhost:8301"
    ```
 
 2. Ko nadzorna ravnina vzpostavi podatkovno verigo lahko začnemo uporabljati odjemalce
     - **CLI**
     ```shell
-   ./build/client_cli -addr <naslov nadzornega vozlišča>
+   client_cli -addr <naslov poljubnega nadzornega vozlišča>
    ```
     - **TUI**
     ```shell
-   ./build/client_tui -addr <naslov nadzornega vozlišča>
+   client_tui -addr <naslov poljubnega nadzornega vozlišča>
    ```

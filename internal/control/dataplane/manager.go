@@ -36,10 +36,18 @@ type NodeConfig struct {
 	ClientRequestsAddress string `json:"clientRequestsAddress,omitempty"`
 }
 
+func (n NodeConfig) String() string {
+	return fmt.Sprintf("NodeConfig{Id: %s, ControlAddress: %s, DataChainAddresses: %s, ClientRequestsAddress: %s}", n.Id, n.ControlAddress, n.DataChainAddresses, n.ClientRequestsAddress)
+}
+
 type NodeDescriptor struct {
 	Pid    int                  `json:"pid,omitempty"`
 	Role   controllink.NodeRole `json:"role,omitempty"`
 	Config NodeConfig           `json:"config"`
+}
+
+func (n NodeDescriptor) String() string {
+	return fmt.Sprintf("NodeDescriptor{Pid: %d, Config: %v}", n.Pid, n.Config)
 }
 
 func (n NodeDescriptor) SubscriptionToken() string {
