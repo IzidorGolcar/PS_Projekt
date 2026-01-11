@@ -77,13 +77,25 @@ func (m *ChainManager) runHealthCheck() {
 
 	var deadNodes []int
 	for i, node := range s.Nodes {
-		if err := m.nodeManager.Ping(node); err != nil {
+		if err := m.checkNode(node); err != nil {
 			deadNodes = append(deadNodes, i)
 		}
 	}
 	m.replaceDeadNodes(s, deadNodes)
 	m.addMissingNodes(s)
 	m.sendStateUpdate(s)
+}
+
+func (m *ChainManager) checkNode(node *dataplane.NodeDescriptor) (err error) {
+	for i := 0; i < 3; i++ {
+		err = m.nodeManager.Ping(node)
+		if err == nil {
+			return
+		}
+		time.Sleep(time.Millisecond * 200)
+		log.Println("Node", node.Config.Id, "is not responding, retrying...")
+	}
+	return
 }
 
 func (m *ChainManager) replaceDeadNodes(s *ChainSnapshot, deadNodes []int) {

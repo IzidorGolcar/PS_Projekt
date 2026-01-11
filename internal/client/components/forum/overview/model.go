@@ -4,6 +4,7 @@ import (
 	"math"
 	"seminarska/internal/client/components/appbar"
 	"strconv"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -52,18 +53,23 @@ func NewModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return LoadRequestCmd(100)
+	return LoadRequestCmd(100, 0)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case LoadResponseMsg:
 		if len(msg.Topics) == 0 {
-			return m, nil
+			return m, LoadRequestCmd(100, time.Second)
 		}
+		initialLoad := !m.loaded
 		m.loaded = true
 		cmd := m.list.SetItems(msg.listItems())
-		return m, tea.Batch(cmd, SelectTopicCmd(msg.Topics[0]))
+		cmds := []tea.Cmd{cmd, LoadRequestCmd(100, time.Second)}
+		if initialLoad {
+			cmds = append(cmds, SelectTopicCmd(msg.Topics[0]))
+		}
+		return m, tea.Batch(cmds...)
 	case tea.WindowSizeMsg:
 		m.w = int(math.Floor(float64(msg.Width) * 0.3))
 		m.h = msg.Height - appbar.Height
