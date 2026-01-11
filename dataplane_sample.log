@@ -1,0 +1,190 @@
+2026/01/11 14:45:49 [data_0] Starting data service
+2026/01/11 14:45:49 [data_0] Switching to state: (Single; ReaderConfirmer)
+2026/01/11 14:45:49 [data_1] Starting data service
+2026/01/11 14:45:50 [data_0] Switching to state: (Single; Reader)
+2026/01/11 14:45:50 [data_1] Switching to state: (Single; Confirmer)
+2026/01/11 14:45:50 [data_0] datalink connecting to  :20081
+2026/01/11 14:45:50 [data_0] Switching to state: (Head; Reader)
+2026/01/11 14:45:50 [data_1] Client: last confirmation index: -1
+2026/01/11 14:45:50 [data_0] Sending full DB snapshot
+2026/01/11 14:45:50 [data_1] Received full DB snapshot
+2026/01/11 14:45:50 [data_1] Switching to state: (Tail; Confirmer)
+2026/01/11 14:45:50 [data_2] Starting data service
+2026/01/11 14:45:50 [data_1] Switching to state: (Tail; Relay)
+2026/01/11 14:45:50 [data_2] Switching to state: (Single; Confirmer)
+2026/01/11 14:45:50 [data_1] datalink connecting to  :20082
+2026/01/11 14:45:50 [data_1] Switching to state: (Middle; Relay)
+2026/01/11 14:45:50 [data_2] Client: last confirmation index: -1
+2026/01/11 14:45:50 [data_1] Sending full DB snapshot
+2026/01/11 14:45:50 [data_2] Received full DB snapshot
+2026/01/11 14:45:50 [data_2] Switching to state: (Tail; Confirmer)
+2026/01/11 14:45:50 [data_3] Starting data service
+2026/01/11 14:45:51 [data_2] Switching to state: (Tail; Relay)
+2026/01/11 14:45:51 [data_3] Switching to state: (Single; Confirmer)
+2026/01/11 14:45:51 [data_2] datalink connecting to  :20083
+2026/01/11 14:45:51 [data_2] Switching to state: (Middle; Relay)
+2026/01/11 14:45:51 [data_4] Starting data service
+2026/01/11 14:45:51 [data_3] Client: last confirmation index: -1
+2026/01/11 14:45:51 [data_2] Sending full DB snapshot
+2026/01/11 14:45:51 [data_3] Received full DB snapshot
+2026/01/11 14:45:51 [data_3] Switching to state: (Tail; Confirmer)
+2026/01/11 14:45:51 [data_3] Switching to state: (Tail; Relay)
+2026/01/11 14:45:51 [data_4] Switching to state: (Single; Confirmer)
+2026/01/11 14:45:51 [data_3] datalink connecting to  :20084
+2026/01/11 14:45:51 [data_3] Switching to state: (Middle; Relay)
+2026/01/11 14:45:51 [data_4] Client: last confirmation index: -1
+2026/01/11 14:45:51 [data_3] Sending full DB snapshot
+2026/01/11 14:45:51 [data_4] Received full DB snapshot
+2026/01/11 14:45:51 [data_4] Switching to state: (Tail; Confirmer)
+2026/01/11 14:49:40 [data_0] Received message: 1
+2026/01/11 14:49:40 [data_1] Received message: 1
+2026/01/11 14:49:40 [data_2] Received message: 1
+2026/01/11 14:49:40 [data_3] Received message: 1
+2026/01/11 14:49:40 [data_4] Received message: 1
+2026/01/11 14:49:40 [data_4] Received confirmation:  1
+2026/01/11 14:49:40 [data_3] Received confirmation:  1
+2026/01/11 14:49:40 [data_2] Received confirmation:  1
+2026/01/11 14:49:40 [data_1] Received confirmation:  1
+2026/01/11 14:49:40 [data_0] Received confirmation:  1
+2026/01/11 14:50:03 [data_0] Received message: 2
+2026/01/11 14:50:03 [data_1] Received message: 2
+2026/01/11 14:50:03 [data_2] Received message: 2
+2026/01/11 14:50:03 [data_3] Received message: 2
+2026/01/11 14:50:03 [data_4] Received message: 2
+2026/01/11 14:50:03 [data_4] Received confirmation:  2
+2026/01/11 14:50:03 [data_3] Received confirmation:  2
+2026/01/11 14:50:03 [data_2] Received confirmation:  2
+2026/01/11 14:50:03 [data_1] Received confirmation:  2
+2026/01/11 14:50:03 [data_0] Received confirmation:  2
+2026/01/11 14:50:20 [data_0] Received message: 3
+2026/01/11 14:50:20 [data_1] Received message: 3
+2026/01/11 14:50:20 [data_2] Received message: 3
+2026/01/11 14:50:20 [data_3] Received message: 3
+2026/01/11 14:50:20 [data_4] Received message: 3
+2026/01/11 14:50:20 [data_4] Received confirmation:  3
+2026/01/11 14:50:20 [data_3] Received confirmation:  3
+2026/01/11 14:50:20 [data_2] Received confirmation:  3
+2026/01/11 14:50:20 [data_1] Received confirmation:  3
+2026/01/11 14:50:20 [data_0] Received confirmation:  3
+
+### data_3 se sesuje
+
+2026/01/11 14:53:13 [data_4] Switching to state: (Single; Confirmer)    <- data_4 zgubi pedhodnika
+2026/01/11 14:53:13 [data_2] Switching to state: (Tail; Relay)          <- data_2 zgubi naslednika
+
+### sledi popravljanje verige:
+
+2026/01/11 14:53:15 [data_0] Switching to state: (Head; Reader)
+2026/01/11 14:53:15 [data_0] datalink connecting to  :20081
+2026/01/11 14:53:15 [data_0] Switching to state: (Single; Reader)
+2026/01/11 14:53:15 [data_0] Switching to state: (Head; Reader)
+2026/01/11 14:53:15 [data_1] Switching to state: (Head; Relay)
+2026/01/11 14:53:15 [data_1] Replacing connection: [::1]:53261 -> [::1]:54488
+2026/01/11 14:53:15 [data_1] Client: last confirmation index: 3
+2026/01/11 14:53:15 [data_0] Successor: last message index: 3
+2026/01/11 14:53:15 [data_0] Received missing confirmations
+2026/01/11 14:53:15 [data_1] Received missing messages
+2026/01/11 14:53:15 [data_1] Switching to state: (Middle; Relay)
+2026/01/11 14:53:15 [data_1] Switching to state: (Middle; Relay)
+2026/01/11 14:53:15 [data_1] Switching to state: (Tail; Relay)
+2026/01/11 14:53:15 [data_1] Switching to state: (Middle; Relay)
+2026/01/11 14:53:15 [data_1] datalink connecting to  :20082
+2026/01/11 14:53:15 [data_2] Switching to state: (Single; Relay)
+2026/01/11 14:53:15 [data_2] Replacing connection: [::1]:53267 -> [::1]:54491
+2026/01/11 14:53:15 [data_2] Client: last confirmation index: 3
+2026/01/11 14:53:15 [data_1] Successor: last message index: 3
+2026/01/11 14:53:15 [data_1] Received missing confirmations
+2026/01/11 14:53:15 [data_2] Received missing messages
+2026/01/11 14:53:15 [data_2] Switching to state: (Tail; Relay)
+2026/01/11 14:53:16 [data_2] Switching to state: (Tail; Relay)
+2026/01/11 14:53:16 [data_2] datalink connecting to  :20084
+2026/01/11 14:53:16 [data_2] Switching to state: (Middle; Relay)
+2026/01/11 14:53:16 [data_4] Replacing connection: [::1]:53279 -> [::1]:54497
+2026/01/11 14:53:16 [data_4] Client: last confirmation index: 3
+2026/01/11 14:53:16 [data_2] Successor: last message index: 3
+2026/01/11 14:53:16 [data_2] Received missing confirmations
+2026/01/11 14:53:16 [data_4] Received missing messages
+2026/01/11 14:53:16 [data_4] Switching to state: (Tail; Confirmer)
+2026/01/11 14:53:16 [data_4] Switching to state: (Tail; Confirmer)
+
+### na rep dodamo novo vozlisce data_5
+
+2026/01/11 14:53:17 [data_5] Starting data service
+2026/01/11 14:53:17 [data_4] Switching to state: (Tail; Relay)
+2026/01/11 14:53:17 [data_5] Switching to state: (Single; Confirmer)
+2026/01/11 14:53:17 [data_4] datalink connecting to  :20085
+2026/01/11 14:53:17 [data_4] Switching to state: (Middle; Relay)
+
+2026/01/11 14:53:17 [data_5] Client: last confirmation index: 3     #
+2026/01/11 14:53:17 [data_4] Sending full DB snapshot               #  handshake
+2026/01/11 14:53:17 [data_5] Received full DB snapshot              #
+
+2026/01/11 14:53:17 [data_5] Switching to state: (Tail; Confirmer)
+2026/01/11 14:54:34 [data_0] Received message: 4
+2026/01/11 14:54:34 [data_1] Received message: 4
+2026/01/11 14:54:34 [data_2] Received message: 4
+2026/01/11 14:54:34 [data_4] Received message: 4
+2026/01/11 14:54:34 [data_5] Received message: 4
+2026/01/11 14:54:34 [data_5] Received confirmation:  4
+2026/01/11 14:54:34 [data_4] Received confirmation:  4
+2026/01/11 14:54:34 [data_2] Received confirmation:  4
+2026/01/11 14:54:34 [data_1] Received confirmation:  4
+2026/01/11 14:54:34 [data_0] Received confirmation:  4
+2026/01/11 14:56:10 [data_0] Received message: 5
+2026/01/11 14:56:10 [data_1] Received message: 5
+2026/01/11 14:56:10 [data_2] Received message: 5
+2026/01/11 14:56:10 [data_4] Received message: 5
+2026/01/11 14:56:10 [data_5] Received message: 5
+2026/01/11 14:56:10 [data_5] Received confirmation:  5
+2026/01/11 14:56:10 [data_4] Received confirmation:  5
+2026/01/11 14:56:10 [data_2] Received confirmation:  5
+2026/01/11 14:56:10 [data_1] Received confirmation:  5
+2026/01/11 14:56:10 [data_0] Received confirmation:  5
+2026/01/11 14:56:29 [data_0] Received message: 6
+2026/01/11 14:56:29 [data_1] Received message: 6
+2026/01/11 14:56:29 [data_2] Received message: 6
+2026/01/11 14:56:29 [data_4] Received message: 6
+2026/01/11 14:56:29 [data_5] Received message: 6
+2026/01/11 14:56:29 [data_5] Received confirmation:  6
+2026/01/11 14:56:29 [data_4] Received confirmation:  6
+2026/01/11 14:56:29 [data_2] Received confirmation:  6
+2026/01/11 14:56:29 [data_1] Received confirmation:  6
+2026/01/11 14:56:29 [data_0] Received confirmation:  6
+2026/01/11 14:58:43 [data_0] Received message: 7
+2026/01/11 14:58:43 [data_1] Received message: 7
+2026/01/11 14:58:43 [data_2] Received message: 7
+2026/01/11 14:58:43 [data_4] Received message: 7
+2026/01/11 14:58:43 [data_5] Received message: 7
+2026/01/11 14:58:43 [data_5] Received confirmation:  7
+2026/01/11 14:58:43 [data_4] Received confirmation:  7
+2026/01/11 14:58:43 [data_2] Received confirmation:  7
+2026/01/11 14:58:43 [data_1] Received confirmation:  7
+2026/01/11 14:58:43 [data_0] Received confirmation:  7
+2026/01/11 15:00:06 [data_0] Received message: 8
+2026/01/11 15:00:06 [data_1] Received message: 8
+2026/01/11 15:00:06 [data_2] Received message: 8
+2026/01/11 15:00:06 [data_4] Received message: 8
+2026/01/11 15:00:06 [data_5] Received message: 8
+2026/01/11 15:00:06 [data_5] Received confirmation:  8
+2026/01/11 15:00:06 [data_4] Received confirmation:  8
+2026/01/11 15:00:06 [data_2] Received confirmation:  8
+2026/01/11 15:00:06 [data_1] Received confirmation:  8
+2026/01/11 15:00:06 [data_0] Received confirmation:  8
+
+# Zaustavitev sistema
+
+2026/01/11 15:00:52 [data_5] Shutting down node
+2026/01/11 15:00:52 [data_1] Shutting down node
+2026/01/11 15:00:52 [data_4] Shutting down node
+2026/01/11 15:00:52 [data_0] Shutting down node
+2026/01/11 15:00:52 [data_2] Shutting down node
+2026/01/11 15:00:52 [data_0] Stopping data service
+2026/01/11 15:00:52 [data_0] Data service stopped
+2026/01/11 15:00:52 [data_1] Stopping data service
+2026/01/11 15:00:52 [data_4] Stopping data service
+2026/01/11 15:00:52 [data_2] Stopping data service
+2026/01/11 15:00:52 [data_5] Stopping data service
+2026/01/11 15:00:52 [data_1] Data service stopped
+2026/01/11 15:00:52 [data_4] Data service stopped
+2026/01/11 15:00:52 [data_2] Data service stopped
+2026/01/11 15:00:52 [data_5] Data service stopped

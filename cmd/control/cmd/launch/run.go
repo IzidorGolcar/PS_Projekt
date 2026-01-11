@@ -28,7 +28,7 @@ func run(cmd *cobra.Command, _ []string) {
 	cfg := control.ChainConfig{
 		LoggerPath:      logFile,
 		DataExecutable:  dataExec,
-		TargetNodeCount: 5,
+		TargetNodeCount: targetDataNodes,
 	}
 	manager := control.NewChainManager(ctx, cfg, fms, r, rpcAddr)
 

@@ -56,6 +56,10 @@ func NewBufferedInterceptor(
 func (o *BufferedInterceptor) OnMessage(message *datalink.Message) error {
 	if message.MessageIndex == 0 {
 		message.MessageIndex = o.opCounter.Next()
+	} else {
+		if message.MessageIndex != o.opCounter.Next() {
+			log.Println("Received message with wrong index:", message.MessageIndex)
+		}
 	}
 	log.Println("Received message:", message.MessageIndex)
 	if err := o.messages.Add(message); err != nil {

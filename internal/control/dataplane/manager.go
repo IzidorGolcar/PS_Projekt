@@ -41,13 +41,14 @@ func (n NodeConfig) String() string {
 }
 
 type NodeDescriptor struct {
-	Pid    int                  `json:"pid,omitempty"`
-	Role   controllink.NodeRole `json:"role,omitempty"`
-	Config NodeConfig           `json:"config"`
+	Pid       int                  `json:"pid,omitempty"`
+	Role      controllink.NodeRole `json:"role,omitempty"`
+	Config    NodeConfig           `json:"config"`
+	Successor string               `json:"successor"`
 }
 
 func (n NodeDescriptor) String() string {
-	return fmt.Sprintf("NodeDescriptor{Pid: %d, Config: %v}", n.Pid, n.Config)
+	return fmt.Sprintf("NodeDescriptor{Pid: %d, Config: %v, Role: %v, Successor: %s}", n.Pid, n.Config, n.Role, n.Successor)
 }
 
 func (n NodeDescriptor) SubscriptionToken() string {
@@ -113,21 +114,31 @@ func (c *NodeManager) Ping(node *NodeDescriptor) error {
 }
 
 func (c *NodeManager) SwitchNodeRole(node *NodeDescriptor, newRole controllink.NodeRole) error {
+	if node.Role == newRole {
+		return nil
+	}
 	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.Config.ControlAddress))
 	_, err := control.SwitchRole(context.Background(), &controllink.SwitchRoleCommand{Role: newRole})
-	if err != nil {
+	if err == nil {
 		node.Role = newRole
 	}
 	return err
 }
 
 func (c *NodeManager) SwitchDataNodeSuccessor(node *NodeDescriptor, successor *NodeDescriptor) error {
+	if (successor == nil && node.Successor == "") ||
+		successor != nil && node.Successor == successor.Config.DataChainAddresses {
+		return nil
+	}
 	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.Config.ControlAddress))
 	addr := ""
 	if successor != nil {
 		addr = successor.Config.DataChainAddresses
 	}
 	_, err := control.SwitchSuccessor(context.Background(), &controllink.SwitchSuccessorCommand{Address: addr})
+	if err == nil {
+		node.Successor = addr
+	}
 	return err
 }
 

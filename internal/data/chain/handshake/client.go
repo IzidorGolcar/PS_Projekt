@@ -50,7 +50,7 @@ func (c *clientHandshake) sendMissingData() error {
 		log.Println("Sending full DB snapshot")
 		return c.stream.Send(c.snapshotMsg())
 	}
-	log.Println("Successor: last message index:", c.serverHello.GetLastMsgIndex())
+	log.Println("successor: last message index:", c.serverHello.GetLastMsgIndex())
 	return c.stream.Send(c.syncMsg(hello.GetLastMsgIndex()))
 }
 

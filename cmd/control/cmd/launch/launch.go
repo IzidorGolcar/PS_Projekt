@@ -7,14 +7,15 @@ import (
 )
 
 var (
-	nodeId    string
-	raftAddr  string
-	httpAddr  string
-	rpcAddr   string
-	dataExec  string
-	logFile   string
-	bootstrap bool
-	Cmd       = &cobra.Command{
+	nodeId          string
+	raftAddr        string
+	httpAddr        string
+	rpcAddr         string
+	dataExec        string
+	logFile         string
+	bootstrap       bool
+	targetDataNodes int
+	Cmd             = &cobra.Command{
 		Use:   "launch",
 		Short: "Launch a new data service node",
 		Run:   run,
@@ -29,6 +30,7 @@ func init() {
 	Cmd.Flags().StringVar(&dataExec, "data-exec", "", "Data execution path")
 	Cmd.Flags().BoolVar(&bootstrap, "bootstrap", false, "Bootstrap flag")
 	Cmd.Flags().StringVar(&logFile, "logs", os.DevNull, "Log file")
+	Cmd.Flags().IntVar(&targetDataNodes, "target-nodes", 5, "Target number of data nodes")
 
 	_ = Cmd.MarkFlagRequired("node-id")
 	_ = Cmd.MarkFlagRequired("raft-addr")

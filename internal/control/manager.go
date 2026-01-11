@@ -202,13 +202,17 @@ func (m *ChainManager) rerouteChain(s *ChainSnapshot) {
 	} else {
 		for i, node := range s.Nodes {
 			if i == 0 {
-				err := m.nodeManager.SwitchNodeRole(node, controllink.NodeRole_MessageReader)
-				if err != nil {
-					log.Fatal("Failed to recover chain with multiple nodes:", err)
+				if node.Role != controllink.NodeRole_MessageReaderConfirmer {
+					err := m.nodeManager.SwitchNodeRole(node, controllink.NodeRole_MessageReader)
+					if err != nil {
+						log.Fatal("Failed to recover chain with multiple nodes:", err)
+					}
 				}
-				err = m.nodeManager.SwitchDataNodeSuccessor(node, s.Nodes[i+1])
-				if err != nil {
-					log.Fatal("Failed to recover chain with multiple nodes:", err)
+				if node.Config.Id != s.Nodes[len(s.Nodes)-1].Config.Id {
+					err := m.nodeManager.SwitchDataNodeSuccessor(node, s.Nodes[i+1])
+					if err != nil {
+						log.Fatal("Failed to recover chain with multiple nodes:", err)
+					}
 				}
 			} else if i == len(s.Nodes)-1 {
 				err := m.nodeManager.SwitchNodeRole(node, controllink.NodeRole_MessageConfirmer)
@@ -221,9 +225,11 @@ func (m *ChainManager) rerouteChain(s *ChainSnapshot) {
 				if err != nil {
 					log.Fatal("Failed to recover chain with multiple nodes:", err)
 				}
-				err = m.nodeManager.SwitchDataNodeSuccessor(node, s.Nodes[i+1])
-				if err != nil {
-					log.Fatal("Failed to recover chain with multiple nodes:", err)
+				if node.Config.Id != s.Nodes[i+1].Config.Id {
+					err = m.nodeManager.SwitchDataNodeSuccessor(node, s.Nodes[i+1])
+					if err != nil {
+						log.Fatal("Failed to recover chain with multiple nodes:", err)
+					}
 				}
 			}
 			time.Sleep(time.Millisecond * 500)
