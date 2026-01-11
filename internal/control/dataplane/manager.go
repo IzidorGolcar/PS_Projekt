@@ -14,50 +14,42 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Manager struct {
+type NodeManager struct {
 	dataExecPath string
 	rpcClient    *rpc.Client
 }
 
-// NewManager creates a new client for controlling the data plane.
+// NewNodeManager creates a new client for controlling the data plane.
 // dataExecPath is the path to the data node executable.
-func NewManager(dataExecPath string) *Manager {
-	return &Manager{
+func NewNodeManager(dataExecPath string) *NodeManager {
+	return &NodeManager{
 		dataExecPath: dataExecPath,
 	}
 }
 
 type NodeConfig struct {
-	Id                    string
-	LoggerPath            string
-	SubscriptionToken     string
-	ControlAddress        string
-	DataChainAddresses    string
-	ClientRequestsAddress string
+	Id                    string `json:"id,omitempty"`
+	LoggerPath            string `json:"loggerPath,omitempty"`
+	SubscriptionToken     string `json:"subscriptionToken,omitempty"`
+	ControlAddress        string `json:"controlAddress,omitempty"`
+	DataChainAddresses    string `json:"dataChainAddresses,omitempty"`
+	ClientRequestsAddress string `json:"clientRequestsAddress,omitempty"`
 }
 
 type NodeDescriptor struct {
-	pid    int
-	role   controllink.NodeRole
-	config NodeConfig
-}
-
-func (n NodeDescriptor) Config() NodeConfig {
-	return n.config
-}
-
-func (n NodeDescriptor) Role() controllink.NodeRole {
-	return n.role
+	Pid    int                  `json:"pid,omitempty"`
+	Role   controllink.NodeRole `json:"role,omitempty"`
+	Config NodeConfig           `json:"config"`
 }
 
 func (n NodeDescriptor) SubscriptionToken() string {
-	return n.config.SubscriptionToken
+	return n.Config.SubscriptionToken
 }
 
 func (n NodeDescriptor) NodeInfo() *razpravljalnica.NodeInfo {
 	return &razpravljalnica.NodeInfo{
-		NodeId:  n.config.Id,
-		Address: n.config.ClientRequestsAddress,
+		NodeId:  n.Config.Id,
+		Address: n.Config.ClientRequestsAddress,
 	}
 }
 
@@ -78,7 +70,7 @@ func NewNodeConfig(
 	}
 }
 
-func (c *Manager) StartNewDataNode(cfg NodeConfig) (*NodeDescriptor, error) {
+func (c *NodeManager) StartNewDataNode(cfg NodeConfig) (*NodeDescriptor, error) {
 	cmd := exec.Command(
 		c.dataExecPath,
 		"-id", cfg.Id, "-o", cfg.LoggerPath, "-control",
@@ -96,47 +88,47 @@ func (c *Manager) StartNewDataNode(cfg NodeConfig) (*NodeDescriptor, error) {
 	}
 
 	descriptor := &NodeDescriptor{
-		config: cfg,
-		pid:    cmd.Process.Pid,
-		role:   controllink.NodeRole_Relay, // default role
+		Config: cfg,
+		Pid:    cmd.Process.Pid,
+		Role:   controllink.NodeRole_Relay, // default role
 	}
 
 	return descriptor, nil
 }
 
-func (c *Manager) Ping(node *NodeDescriptor) error {
-	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.config.ControlAddress))
+func (c *NodeManager) Ping(node *NodeDescriptor) error {
+	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.Config.ControlAddress))
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	_, err := control.Ping(ctx, &emptypb.Empty{})
 	return err
 }
 
-func (c *Manager) SwitchNodeRole(node *NodeDescriptor, newRole controllink.NodeRole) error {
-	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.config.ControlAddress))
+func (c *NodeManager) SwitchNodeRole(node *NodeDescriptor, newRole controllink.NodeRole) error {
+	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.Config.ControlAddress))
 	_, err := control.SwitchRole(context.Background(), &controllink.SwitchRoleCommand{Role: newRole})
 	if err != nil {
-		node.role = newRole
+		node.Role = newRole
 	}
 	return err
 }
 
-func (c *Manager) SwitchDataNodeSuccessor(node *NodeDescriptor, successor *NodeDescriptor) error {
-	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.config.ControlAddress))
+func (c *NodeManager) SwitchDataNodeSuccessor(node *NodeDescriptor, successor *NodeDescriptor) error {
+	control := controllink.NewControlServiceClient(rpc.NewClient(context.Background(), node.Config.ControlAddress))
 	addr := ""
 	if successor != nil {
-		addr = successor.config.DataChainAddresses
+		addr = successor.Config.DataChainAddresses
 	}
 	_, err := control.SwitchSuccessor(context.Background(), &controllink.SwitchSuccessorCommand{Address: addr})
 	return err
 }
 
-func (c *Manager) DisconnectDataNodeSuccessor(node *NodeDescriptor) error {
+func (c *NodeManager) DisconnectDataNodeSuccessor(node *NodeDescriptor) error {
 	return c.SwitchDataNodeSuccessor(node, nil)
 }
 
-func (c *Manager) TerminateDataNode(node *NodeDescriptor) error {
-	proc, err := os.FindProcess(node.pid)
+func (c *NodeManager) TerminateDataNode(node *NodeDescriptor) error {
+	proc, err := os.FindProcess(node.Pid)
 	if err != nil {
 		return fmt.Errorf("failed to find process: %w", err)
 	}

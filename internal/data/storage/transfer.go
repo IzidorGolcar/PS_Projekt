@@ -43,7 +43,7 @@ func (d *AppDatabase) SetFromSnapshot(snapshot *datalink.DatabaseSnapshot) {
 	likes := make([]*entities.Like, len(snapshot.Likes))
 
 	for i, m := range snapshot.Messages {
-		messages[i] = entities.NewMessage(m.UserId, m.TopicId, m.Text, m.CreatedAt.AsTime())
+		messages[i] = entities.NewMessage(m.TopicId, m.UserId, m.Text, m.CreatedAt.AsTime())
 		messages[i].SetId(m.Id)
 	}
 	for i, u := range snapshot.Users {

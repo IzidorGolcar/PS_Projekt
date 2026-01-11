@@ -18,6 +18,7 @@ func (d *AppDatabase) GetMessage(id int64) (*entities.Message, error) {
 }
 
 func (d *AppDatabase) GetMessages(fromId int64, topicId int64, limit int32) ([]*entities.Message, error) {
+
 	return d.Messages().GetPredicate(func(message *entities.Message) bool {
 		return message.Id() >= fromId && message.TopicId == topicId
 	}, int(limit))

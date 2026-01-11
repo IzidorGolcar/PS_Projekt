@@ -16,7 +16,7 @@ echo 'building CLI client'
 go build -o build/client_cli cmd/cli_client/main.go
 
 echo 'building control service'
-go build -o build/contrl_service cmd/control/main.go
+go build -o build/control_service cmd/control/main.go
 
 
 echo 'done'

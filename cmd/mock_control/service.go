@@ -17,12 +17,12 @@ import (
 type MockControlService struct {
 	rpcServer *rpc.Server
 	nodes     []dataplane.NodeDescriptor
-	manager   *dataplane.Manager
+	manager   *dataplane.NodeManager
 	handler   *clientHandler
 }
 
 func NewMockControlService(dataNodeExec, addr string) MockControlService {
-	manager := dataplane.NewManager(dataNodeExec)
+	manager := dataplane.NewNodeManager(dataNodeExec)
 	nodes := launchDataNodes(manager)
 	h := newClientHandler(nodes)
 	return MockControlService{
@@ -33,7 +33,7 @@ func NewMockControlService(dataNodeExec, addr string) MockControlService {
 	}
 }
 
-func launchDataNodes(manager *dataplane.Manager) []dataplane.NodeDescriptor {
+func launchDataNodes(manager *dataplane.NodeManager) []dataplane.NodeDescriptor {
 	head, err := manager.StartNewDataNode(dataplane.NewNodeConfig(
 		"node1", os.DevNull,
 		"secret", ":6971", ":6981", ":6991",

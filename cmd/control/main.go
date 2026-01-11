@@ -86,13 +86,13 @@ func main() {
 	raftServer := raft.NewRaftServer(ctx, *raftAddr, raftNode, clusterManager)
 	_ = raftServer // Server runs in background goroutine
 
-	var manager *dataplane.Manager
+	var manager *dataplane.NodeManager
 	var nodes []dataplane.NodeDescriptor
 	var nodeCounter atomic.Int32
 	var nodesMu sync.Mutex
 
 	if *dataExec != "" {
-		manager = dataplane.NewManager(*dataExec)
+		manager = dataplane.NewNodeManager(*dataExec)
 		nodes = launchDataNodes(manager)
 		nodeCounter.Store(int32(len(nodes)))
 		log.Printf("Launched %d data nodes", len(nodes))
@@ -173,7 +173,7 @@ func main() {
 }
 
 // launchDataNodes starts data nodes and connects them in a chain (like mock_control)
-func launchDataNodes(manager *dataplane.Manager) []dataplane.NodeDescriptor {
+func launchDataNodes(manager *dataplane.NodeManager) []dataplane.NodeDescriptor {
 	head, err := manager.StartNewDataNode(dataplane.NewNodeConfig(
 		"node1", os.DevNull,
 		"secret", ":6971", ":6981", ":6991",

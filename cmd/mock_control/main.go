@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"seminarska/internal/control/dataplane"
 )
 
 // **************************************
@@ -13,6 +15,7 @@ import (
 // **************************************
 
 func main() {
+	log.SetOutput(os.Stdout)
 	nodeExecPath := flag.String("path", "", "Path to the data node executable")
 	flag.Parse()
 	if *nodeExecPath == "" {
@@ -22,10 +25,19 @@ func main() {
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	service := NewMockControlService(*nodeExecPath, ":8080")
+
+	cfg := dataplane.ChainConfig{
+		LoggerPath:      "/Users/izidor/Code/UNI/PS/seminarska/logs/dataplane.log",
+		DataExecutable:  *nodeExecPath,
+		TargetNodeCount: 5,
+	}
+	manager := dataplane.NewChainManager(ctx, cfg, ":8080")
+
+	//service := NewMockControlService(*nodeExecPath, ":8080")
+
 	fmt.Println("Listening on :8080")
 	fmt.Println("Press Ctrl+C to exit")
 	<-ctx.Done()
 	fmt.Println("Stopping...")
-	service.Shutdown()
+	<-manager.Done()
 }
